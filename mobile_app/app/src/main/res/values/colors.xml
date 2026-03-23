@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="splash_bg">#139487</color>
+    <color name="primary_teal">#139487</color>
+    <color name="text_dark">#1E293B</color>
+    <color name="text_secondary">#64748B</color>
+    
+    <!-- Ultra Light Backgrounds -->
+    <color name="admin_bg">#FDFDFD</color> 
+    <color name="admin_surface">#FFFFFF</color>
+    <color name="admin_brand">#4F46E5</color> 
+    <color name="admin_success">#10B981</color>
+    <color name="admin_warning">#F59E0B</color>
+    <color name="admin_danger">#EF4444</color>
+
+    <!-- Role Accents - Soft Pastels -->
+    <color name="light_blue">#F0F7FF</color>
+    <color name="light_green">#F0FDF4</color>
+    <color name="light_amber">#FFFBEB</color>
+    <color name="light_purple">#F5F3FF</color>
+    <color name="light_red">#FEF2F2</color>
+    <color name="gray_light">#F1F5F9</color>
+
+    <!-- Mapped Accents for Admin Screens -->
+    <color name="accent_blue_light">#F0F7FF</color>
+    <color name="accent_green_light">#F0FDF4</color>
+    <color name="accent_amber_light">#FFFBEB</color>
+    <color name="accent_purple_light">#F5F3FF</color>
+    
+    <!-- Dashboard Specific Mappings -->
+    <color name="light_indigo">#EEF2FF</color>
+    <color name="light_emerald">#ECFDF5</color>
+    
+    <!-- Neutral Borders -->
+    <color name="border_neutral">#E2E8F0</color>
+    <color name="border_light">#E2E8F0</color>
+    
+    <color name="bg_light">#F8FAFC</color>
+    <color name="bg_light_teal">#F0FDF4</color>
+    <color name="bg_light_blue">#F1F5F9</color>
+    <color name="bg_light_green">#F0FFF4</color>
+    <color name="red_critical">#EF4444</color>
+    <color name="orange_warning">#F59E0B</color>
+    <color name="chip_red_bg">#FEF2F2</color>
+    <color name="chip_orange_bg">#FFFBEB</color>
+    <color name="chip_grey_bg">#F1F5F9</color>
+    <color name="divider_color">#F1F5F9</color>
+    <color name="qa_patient_bg">#F0FDF4</color>
+    <color name="qa_patient_icon">#16A34A</color>
+    <color name="qa_ai_bg">#EFF6FF</color>
+    <color name="qa_ai_icon">#2563EB</color>
+    
+    <color name="admin_primary">#4F46E5</color>
+
+    <!-- Reassessment colors -->
+    <color name="red_500">#EF4444</color>
+    <color name="blue_600">#2563EB</color>
+    <color name="amber_700">#D97706</color>
+    <color name="green_500">#10B981</color>
+</resources>

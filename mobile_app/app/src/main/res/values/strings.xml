@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">cdss</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_patients">Patients</string>
+    <string name="nav_alerts">Alerts</string>
+    <string name="nav_settings">Settings</string>
+</resources>

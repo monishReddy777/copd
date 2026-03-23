@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+venv/
+env/
+.env
+db.sqlite3
+
+# Build
+dist/
+build/
+*.pyc
+__pycache__/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="2dp"
+    app:cardBackgroundColor="@color/white"
+    app:strokeWidth="1dp"
+    app:strokeColor="#FEE2E2">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Header row: icon + title + time ago -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/iv_alert_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_warning"
+                app:tint="#EF4444" />
+
+            <TextView
+                android:id="@+id/tv_alert_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="SpO₂ Check Due"
+                android:textColor="#EF4444"
+                android:textStyle="bold"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tv_severity_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/chip_red_rounded"
+                android:backgroundTint="#FEF2F2"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="3dp"
+                android:text="Overdue"
+                android:textColor="#EF4444"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Patient info -->
+        <TextView
+            android:id="@+id/tv_patient_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Robert Chen (Bed 302)"
+            android:textColor="#1A1C1E"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+
+        <!-- Reassessment type + due time -->
+        <TextView
+            android:id="@+id/tv_alert_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="SpO₂ recheck • Overdue by 5 mins"
+            android:textColor="#64748B"
+            android:textSize="13sp" />
+
+        <!-- Scheduled by label -->
+        <TextView
+            android:id="@+id/tv_scheduled_by"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Scheduled by: Doctor"
+            android:textColor="#94A3B8"
+            android:textSize="11sp"
+            android:textStyle="italic" />
+
+        <!-- Action buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_perform_reassessment"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="Perform Reassessment"
+                android:textAllCaps="false"
+                android:textSize="12sp"
+                app:backgroundTint="@color/primary_teal"
+                android:textColor="@color/white"
+                app:cornerRadius="8dp"
+                app:icon="@drawable/ic_check_circle"
+                app:iconSize="16dp"
+                app:iconTint="@color/white"
+                app:iconGravity="textStart" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_view_patient"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="View Patient"
+                android:textAllCaps="false"
+                android:textSize="12sp"
+                app:backgroundTint="#F1F5F9"
+                android:textColor="#64748B"
+                app:cornerRadius="8dp" />
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>
