@@ -317,6 +317,10 @@ class VitalsAPIView(APIView):
                 Alert.objects.create(patient=p, severity='normal', message=f'Normal SpO2: {spo2}%')
                 p.status = 'stable'
             p.save()
+
+            # TRIGGER AI RECOMMENDATION FOR THERAPY
+            generate_ai_recommendation(p)
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -345,6 +349,9 @@ class ABGDataAPIView(APIView):
                 )
                 for doc in CustomUser.objects.filter(role='doctor'):
                     Notification.objects.create(user=doc, title='NIV Recommendation', message=f'NIV Recommended for {p.full_name}')
+
+            # TRIGGER AI RECOMMENDATION FOR THERAPY
+            generate_ai_recommendation(p)
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -578,6 +585,37 @@ class ToggleStaffStatusAPIView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
 # --- ADMIN PANEL: Real-time Dashboard Metrics ---
+def generate_ai_recommendation(patient):
+    """Helper to generate and save a recommendation if needed."""
+    from .ai_utils import get_ai_prediction
+    
+    # 1. Get latest data
+    vitals = Vitals.objects.filter(patient=patient).order_by('-created_at').first()
+    abg = ABGData.objects.filter(patient=patient).order_by('-created_at').first()
+    
+    data = {
+        "spo2": vitals.spo2 if vitals else 95,
+        "resp_rate": vitals.resp_rate if vitals else 16,
+        "heart_rate": vitals.heart_rate if vitals else 75,
+        "ph": abg.ph if abg else 7.4,
+        "paco2": abg.paco2 if abg else 40,
+        "pao2": abg.pao2 if abg else 85,
+        "hco3": abg.hco3 if abg else 24
+    }
+    
+    prediction = get_ai_prediction(data)
+    rec_content = f"AI recommends {prediction.get('recommended_device')} (Flow: {prediction.get('flow_rate')}) based on latest clinical data."
+    
+    # Check for existing pending recommendation with same content
+    existing = Recommendation.objects.filter(patient=patient, status='pending', content=rec_content).exists()
+    if not existing:
+        Recommendation.objects.create(
+            patient=patient,
+            rec_type='therapy',
+            content=rec_content,
+            status='pending'
+        )
+
 class AdminDashboardStatsAPIView(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
@@ -654,7 +692,8 @@ class AIRiskAPIView(APIView):
                 "risk_level": prediction.get('risk_level', 'MODERATE'),
                 "confidence_score": prediction.get('confidence_score', 75),
                 "key_factors": key_factors,
-                "recommended_device": prediction.get('recommended_device')
+                "recommended_device": prediction.get('recommended_device'),
+                "flow_rate": prediction.get('flow_rate')
             })
         except Patient.DoesNotExist:
             return Response(status=404)
@@ -669,13 +708,56 @@ class AIRiskAPIView(APIView):
             Recommendation.objects.create(
                 patient=p,
                 rec_type='therapy',
-                content=f"AI recommends {prediction.get('recommended_device')} with {prediction.get('confidence_score')}% confidence based on latest vitals.",
+                content=f"AI recommends {prediction.get('recommended_device')} (Flow: {prediction.get('flow_rate')}) with {prediction.get('confidence_score')}% confidence based on latest clinical data.",
                 status='pending'
             )
             
             return Response({"message": "AI Analysis completed and recommendation saved.", "prediction": prediction})
         except Patient.DoesNotExist:
             return Response(status=404)
+
+class AcceptTherapyAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, pk):
+        try:
+            p = Patient.objects.get(pk=pk)
+            # Only Doctors can approve therapy
+            if request.user.role != 'doctor':
+                return Response({"error": "Only doctors can approve therapy"}, status=403)
+            
+            rec_id = request.data.get('recommendation_id')
+            rec = Recommendation.objects.get(id=rec_id, patient=p)
+            
+            # Parse device and flow from content if not explicitly stored
+            # (In a more robust system, we'd have fields on Recommendation)
+            content = rec.content
+            # AI recommends [Device] (Flow: [Flow]) ...
+            import re
+            device_match = re.search(r"AI recommends (.*?) \(Flow: (.*?)\)", content)
+            
+            if device_match:
+                p.current_device = device_match.group(1)
+                p.current_flow_rate = device_match.group(2)
+            else:
+                # Fallback parsing
+                p.current_device = content.split("AI recommends ")[1].split(" with")[0]
+                p.current_flow_rate = "As recommended"
+
+            p.therapy_approved_at = timezone.now()
+            p.save()
+            
+            rec.status = 'accepted'
+            rec.save()
+            
+            return Response({
+                "message": "Therapy approved successfully",
+                "current_device": p.current_device,
+                "current_flow_rate": p.current_flow_rate
+            })
+        except (Patient.DoesNotExist, Recommendation.DoesNotExist):
+            return Response({"error": "Patient or Recommendation not found"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
 
 class TrendAnalysisAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -694,8 +776,31 @@ class DecisionSupportAPIView(APIView):
     def get(self, request, pk):
         try:
             p = Patient.objects.get(pk=pk)
+            # 1. Get Risk Analysis (same logic as AIRiskAPIView.get_data)
+            risk_view = AIRiskAPIView()
+            analysis_data, vitals, abg = risk_view.get_data(p)
+            prediction = get_ai_prediction(analysis_data)
+            
+            # 2. Trigger recommendation if none exists (or data refreshed)
+            generate_ai_recommendation(p)
+            
+            # 3. Get Recommendations
             recs = Recommendation.objects.filter(patient=p).order_by('-created_at')
-            return Response(RecommendationSerializer(recs, many=True).data)
+            
+            return Response({
+                "has_data": True if (vitals or abg) else False,
+                "risk_level": prediction.get('risk_level', 'MODERATE'),
+                "confidence_score": prediction.get('confidence_score', 75),
+                "action_level": prediction.get('risk_level', 'WARNING'),
+                "recommendation": f"Consider {prediction.get('recommended_device')} at {prediction.get('flow_rate')}.",
+                "overall_status": p.status,
+                "paco2_status": "Rising" if (abg and abg.paco2 > 45) else "Normal",
+                "ph_status": "Dropping" if (abg and abg.ph < 7.35) else "Normal",
+                "spo2_status": "Low" if (vitals and vitals.spo2 < 90) else "Stable",
+                "acidosis": 1 if (abg and abg.ph < 7.35) else 0,
+                "hypercapnia": 1 if (abg and abg.paco2 > 45) else 0,
+                "recommendations": RecommendationSerializer(recs, many=True).data
+            })
         except Patient.DoesNotExist:
             return Response(status=404)
 
@@ -1042,9 +1147,17 @@ class OxygenStatusAPIView(APIView):
 
         # Build oxygen status from latest vitals
         latest_vitals = p.vitals.order_by('-created_at').first()
-        if not latest_vitals:
+        
+        # Check for oxygen requirement record
+        oxy_req = p.oxygen_req.order_by('-created_at').first()
+
+        # LOGGING FOR DEBUGGING
+        print(f"DEBUG: OxygenStatus for patient {pk}, vitals={latest_vitals}, current_device={p.current_device}")
+
+        if not latest_vitals and not p.current_device:
             return Response({
                 'spo2': '--',
+                'current_spo2': '--',
                 'target_spo2': '88-92',
                 'device': 'Not Set',
                 'flow_rate': '--',
@@ -1052,25 +1165,21 @@ class OxygenStatusAPIView(APIView):
                 'status': 'no_data'
             })
 
-        spo2 = latest_vitals.spo2
-        fio2 = latest_vitals.fio2 or 21
-
-        if spo2 < 88:
-            status_val = 'below_target'
-        elif spo2 > 92:
-            status_val = 'above_target'
-        else:
-            status_val = 'within_target'
-
-        # Check for oxygen requirement record
-        oxy_req = p.oxygen_req.order_by('-created_at').first()
+        spo2 = latest_vitals.spo2 if latest_vitals else '--'
+        fio2 = (latest_vitals.fio2 if latest_vitals else None) or 21
+        
+        status_val = 'stable'
+        if isinstance(spo2, int):
+            if spo2 < 88: status_val = 'below_target'
+            elif spo2 > 92: status_val = 'above_target'
+            else: status_val = 'within_target'
 
         return Response({
             'spo2': spo2,
             'current_spo2': spo2,
             'target_spo2': '88-92',
-            'device': 'Nasal Cannula' if oxy_req else 'Not Set',
-            'flow_rate': f'{oxy_req.lpm_required} L/min' if oxy_req else '--',
+            'device': p.current_device or ('Nasal Cannula' if oxy_req else 'Not Set'),
+            'flow_rate': p.current_flow_rate or (f'{oxy_req.lpm_required} L/min' if oxy_req else '--'),
             'fio2': fio2,
             'status': status_val
         })
@@ -1100,6 +1209,88 @@ class ReassessmentChecklistAPIView(APIView):
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
 
+class ReassessmentScheduleAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            p = Patient.objects.get(pk=pk)
+        except Patient.DoesNotExist:
+            return Response(status=404)
+        
+        schedules = ReassessmentSchedule.objects.filter(patient=p).order_by('-scheduled_at')
+        return Response(ReassessmentScheduleSerializer(schedules, many=True).data)
+
+    def post(self, request, pk):
+        try:
+            p = Patient.objects.get(pk=pk)
+        except Patient.DoesNotExist:
+            return Response(status=404)
+
+        data = request.data.copy()
+        data['patient'] = p.id
+        # Calculate scheduled_at based on interval
+        interval = int(data.get('interval_minutes', 60))
+        data['scheduled_at'] = timezone.now() + timedelta(minutes=interval)
+
+        serializer = ReassessmentScheduleSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+class StaffListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Doctors need to list staff to assign reassessments
+        staff = Staff.objects.filter(status='active')
+        return Response(StaffSerializer(staff, many=True).data)
+
+class AcceptTherapyAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            p = Patient.objects.get(pk=pk)
+            rec_id = request.data.get('recommendation_id')
+            rec = Recommendation.objects.get(id=rec_id, patient=p)
+            
+            # Logic to extract device and flow from recommendation content
+            # Or use specific fields if added to Recommendation model.
+            # For now, we assume simple status update and patient field updates.
+            rec.status = 'approved'
+            rec.save()
+            
+            # Update patient's current therapy based on the recommendation
+            # (In a real app, this would be more structured)
+            # We'll try to parse the content or use dummy updates for demo.
+            if 'HFNC' in rec.content:
+                p.current_device = 'High Flow Nasal Cannula (HFNC)'
+                p.current_flow_rate = '40L/min, 40%'
+            elif 'Venturi' in rec.content:
+                p.current_device = 'Venturi Mask'
+                p.current_flow_rate = '35%'
+            elif 'Nasal Cannula' in rec.content:
+                p.current_device = 'Nasal Cannula'
+                p.current_flow_rate = '2L/min'
+            elif 'Non-Rebreather' in rec.content:
+                p.current_device = 'Non-Rebreather Mask'
+                p.current_flow_rate = '15L/min'
+            
+            p.save()
+            
+            # Create a notification for the patient/staff about therapy change
+            Notification.objects.create(
+                user=request.user, # The doctor who approved
+                title="Therapy Changed",
+                message=f"Therapy for {p.full_name} updated to {p.current_device}."
+            )
+            
+            return Response({"message": "Therapy approved and applied."})
+        except (Patient.DoesNotExist, Recommendation.DoesNotExist):
+            return Response(status=404)
+
 
 class ABGTrendsAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1110,21 +1301,45 @@ class ABGTrendsAPIView(APIView):
         except Patient.DoesNotExist:
             return Response(status=404)
 
-        abg_records = ABGData.objects.filter(patient=p).order_by('-created_at')[:10]
+        # Get records from both ABGData and Vitals
+        abg_records = ABGData.objects.filter(patient=p).order_by('-created_at')[:20]
+        vitals_records = Vitals.objects.filter(patient=p).order_by('-created_at')[:40]
+        
         trends = []
+        
+        # Add ABG records
         for a in abg_records:
-            # Try to find a matching SpO2 reading near this ABG's timestamp
-            v = Vitals.objects.filter(patient=p, created_at__lte=a.created_at).order_by('-created_at').first()
             trends.append({
-                'date': a.created_at.isoformat(),
+                'type': 'abg',
                 'timestamp': a.created_at.isoformat(),
                 'ph': a.ph,
                 'paco2': a.paco2,
                 'pao2': a.pao2,
                 'hco3': a.hco3,
                 'fio2': a.fio2,
-                'spo2': v.spo2 if v else 95 # Fallback to 95 if no vitals yet
+                'spo2': None # Will try to match from vitals if possible
             })
+            
+        # Add Vitals records (primarily for SpO2 trends)
+        for v in vitals_records:
+            # Check if we already have a record around this time (to avoid duplicates)
+            # For simplicity, we just add them all and let frontend handle sorting/merging
+            trends.append({
+                'type': 'vitals',
+                'timestamp': v.created_at.isoformat(),
+                'ph': None,
+                'paco2': None,
+                'pao2': None,
+                'hco3': None,
+                'fio2': v.fio2 or 21,
+                'spo2': v.spo2,
+                'hr': v.heart_rate,
+                'rr': v.resp_rate
+            })
+            
+        # Sort combined trends by timestamp
+        trends.sort(key=lambda x: x['timestamp'])
+        
         return Response({
             'trends': trends,
             'count': len(trends)

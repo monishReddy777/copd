@@ -17,7 +17,8 @@ const ABGTrendsTab = ({ patientId }) => {
     setLoading(true);
     try {
       const { data } = await getABGTrends(patientId);
-      setTrends(Array.isArray(data) ? data : data.trends || data.data || []);
+      // Backend now returns { trends: [...] }
+      setTrends(data.trends || []);
     } catch {
       // Mock trend data
       const now = Date.now();

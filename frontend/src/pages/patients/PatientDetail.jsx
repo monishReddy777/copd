@@ -197,11 +197,11 @@ const PatientDetail = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid var(--border-light)' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Current Device</span>
-                <span style={{ fontWeight: 600 }}>Nasal Cannula</span>
+                <span style={{ fontWeight: 600 }}>{patient.current_device || 'Not Set'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid var(--border-light)' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Flow Rate</span>
-                <span style={{ fontWeight: 600 }}>2 L/min</span>
+                <span style={{ fontWeight: 600 }}>{patient.current_flow_rate || '--'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid var(--border-light)' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Target SpO2</span>
@@ -224,10 +224,10 @@ const PatientDetail = () => {
       {activeTab === 'vitals' && <VitalsTab patientId={id} />}
       {activeTab === 'abg' && <ABGTab patientId={id} />}
       {activeTab === 'oxygen' && <OxygenTab patientId={id} />}
-      {activeTab === 'clinical' && <ClinicalDataTab patientId={id} />}
+      {activeTab === 'clinical' && <ClinicalDataTab patientId={id} patient={patient} />}
       {role === 'doctor' && activeTab === 'therapy' && <TherapyTab patientId={id} />}
       {role === 'doctor' && activeTab === 'ai-analysis' && <AIAnalysisTab patientId={id} />}
-      {role === 'doctor' && activeTab === 'decision' && <DecisionSupportTab patientId={id} />}
+      {role === 'doctor' && activeTab === 'decision' && <DecisionSupportTab patientId={id} patient={patient} onApproval={fetchPatientData} />}
       {activeTab === 'trends' && <ABGTrendsTab patientId={id} />}
       {activeTab === 'escalation' && <EscalationTab patientId={id} />}
 

@@ -107,10 +107,32 @@ class StaffSerializer(serializers.ModelSerializer):
 class PatientSerializer(serializers.ModelSerializer):
     latest_vitals = serializers.SerializerMethodField()
     latest_abg = serializers.SerializerMethodField()
+    baseline_data = serializers.SerializerMethodField()
+    latest_symptoms = serializers.SerializerMethodField()
+    latest_spirometry = serializers.SerializerMethodField()
 
     class Meta:
         model = Patient
         fields = '__all__'
+
+    def get_baseline_data(self, obj):
+        try:
+            b = obj.baseline
+            return BaselineDetailsSerializer(b).data
+        except:
+            return None
+
+    def get_latest_symptoms(self, obj):
+        s = obj.symptoms.order_by('-created_at').first()
+        if s:
+            return SymptomsSerializer(s).data
+        return None
+
+    def get_latest_spirometry(self, obj):
+        s = obj.spirometry.order_by('-created_at').first()
+        if s:
+            return SpirometryDataSerializer(s).data
+        return None
 
     def get_latest_vitals(self, obj):
         v = obj.vitals.order_by('-created_at').first()
@@ -198,9 +220,10 @@ class AlertSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ReassessmentScheduleSerializer(serializers.ModelSerializer):
+    staff_name = serializers.CharField(source='assigned_staff.name', read_only=True)
     class Meta:
         model = ReassessmentSchedule
-        fields = '__all__'
+        fields = ['id', 'patient', 'assigned_staff', 'staff_name', 'interval_minutes', 'scheduled_at', 'completed', 'created_at']
 
 class ReassessmentChecklistSerializer(serializers.ModelSerializer):
     class Meta:

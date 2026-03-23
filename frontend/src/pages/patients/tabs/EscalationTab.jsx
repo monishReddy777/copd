@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getEscalationCriteria, getNIVRecommendation, getUrgentAction, scheduleReassessment } from '../../../api/therapy';
+import { getEscalationCriteria, getNIVRecommendation, getUrgentAction, scheduleReassessment, getStaffList } from '../../../api/therapy';
 import { ShieldAlert, AlertTriangle, CheckCircle, Clock, AlertCircle, Wind, CalendarPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -9,12 +9,23 @@ const EscalationTab = ({ patientId }) => {
   const [urgent, setUrgent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showSchedule, setShowSchedule] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({ type: 'routine', interval_minutes: 60, notes: '' });
+  const [scheduleForm, setScheduleForm] = useState({ type: 'routine', interval_minutes: 60, notes: '', assigned_staff: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [staffList, setStaffList] = useState([]);
 
   useEffect(() => {
     fetchAllData();
+    fetchStaff();
   }, [patientId]);
+
+  const fetchStaff = async () => {
+    try {
+      const { data } = await getStaffList();
+      setStaffList(data || []);
+    } catch (error) {
+      console.error('Error fetching staff:', error);
+    }
+  };
 
   const fetchAllData = async () => {
     try {
@@ -190,6 +201,15 @@ const EscalationTab = ({ patientId }) => {
                   <option value={240}>4 hours</option>
                 </select>
               </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Assign To (Staff)</label>
+              <select className="form-select" value={scheduleForm.assigned_staff} onChange={e => setScheduleForm({...scheduleForm, assigned_staff: e.target.value})} required>
+                <option value="">Select Staff Member</option>
+                {staffList.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.department})</option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
               <label className="form-label">Notes (optional)</label>

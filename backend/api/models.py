@@ -55,6 +55,11 @@ class Patient(models.Model):
     assigned_doctor = models.ForeignKey(CustomUser, related_name='patients_doctor', on_delete=models.SET_NULL, null=True, blank=True)
     created_by = models.ForeignKey(CustomUser, related_name='patients_staff', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Therapy Fields
+    current_device = models.CharField(max_length=255, null=True, blank=True)
+    current_flow_rate = models.CharField(max_length=100, null=True, blank=True)
+    therapy_approved_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'patients'
@@ -145,6 +150,7 @@ class Alert(models.Model):
 
 class ReassessmentSchedule(models.Model):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='schedules')
+    assigned_staff = models.ForeignKey(Staff, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_schedules')
     interval_minutes = models.IntegerField()
     scheduled_at = models.DateTimeField()
     completed = models.BooleanField(default=False)

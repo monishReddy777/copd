@@ -20,7 +20,7 @@ const Section = ({ title, icon, children, defaultOpen = false }) => {
   );
 };
 
-const ClinicalDataTab = ({ patientId }) => {
+const ClinicalDataTab = ({ patientId, patient }) => {
   const [submitting, setSubmitting] = useState({});
 
   const handleSubmit = async (section, apiCall, formData) => {
@@ -40,35 +40,55 @@ const ClinicalDataTab = ({ patientId }) => {
 
       {/* Baseline Details */}
       <Section title="Baseline Details" icon={<FileText size={18} color="var(--accent-primary)" />} defaultOpen={true}>
-        <BaselineForm onSubmit={(data) => handleSubmit('Baseline Details', addBaselineDetails, data)} submitting={submitting['Baseline Details']} />
+        <BaselineForm 
+          initialData={patient?.baseline_data}
+          onSubmit={(data) => handleSubmit('Baseline Details', addBaselineDetails, data)} 
+          submitting={submitting['Baseline Details']} 
+        />
       </Section>
 
       {/* GOLD Classification */}
       <Section title="GOLD Classification" icon={<Activity size={18} color="#F59E0B" />}>
-        <GoldForm onSubmit={(data) => handleSubmit('GOLD Classification', addGoldClassification, data)} submitting={submitting['GOLD Classification']} />
+        <GoldForm 
+          initialData={patient?.latest_spirometry} // GOLD is part of spirometry in models
+          onSubmit={(data) => handleSubmit('GOLD Classification', addGoldClassification, data)} 
+          submitting={submitting['GOLD Classification']} 
+        />
       </Section>
 
       {/* Spirometry */}
       <Section title="Spirometry Data" icon={<Wind size={18} color="#3B82F6" />}>
-        <SpirometryForm onSubmit={(data) => handleSubmit('Spirometry', addSpirometry, data)} submitting={submitting['Spirometry']} />
+        <SpirometryForm 
+          initialData={patient?.latest_spirometry}
+          onSubmit={(data) => handleSubmit('Spirometry', addSpirometry, data)} 
+          submitting={submitting['Spirometry']} 
+        />
       </Section>
 
       {/* Gas Exchange History */}
       <Section title="Gas Exchange History" icon={<Droplets size={18} color="#8B5CF6" />}>
-        <GasExchangeForm onSubmit={(data) => handleSubmit('Gas Exchange', addGasExchangeHistory, data)} submitting={submitting['Gas Exchange']} />
+        <GasExchangeForm 
+          initialData={patient?.latest_abg}
+          onSubmit={(data) => handleSubmit('Gas Exchange', addGasExchangeHistory, data)} 
+          submitting={submitting['Gas Exchange']} 
+        />
       </Section>
 
       {/* Current Symptoms */}
       <Section title="Current Symptoms" icon={<Stethoscope size={18} color="#EF4444" />}>
-        <SymptomsForm onSubmit={(data) => handleSubmit('Current Symptoms', addCurrentSymptoms, data)} submitting={submitting['Current Symptoms']} />
+        <SymptomsForm 
+          initialData={patient?.latest_symptoms}
+          onSubmit={(data) => handleSubmit('Current Symptoms', addCurrentSymptoms, data)} 
+          submitting={submitting['Current Symptoms']} 
+        />
       </Section>
     </div>
   );
 };
 
 // ── Baseline Details Form ──
-const BaselineForm = ({ onSubmit, submitting }) => {
-  const [form, setForm] = useState({ smoking_status: 'former', pack_years: '', copd_duration_years: '', comorbidities: '', bmi: '' });
+const BaselineForm = ({ onSubmit, submitting, initialData }) => {
+  const [form, setForm] = useState(initialData || { smoking_status: 'former', pack_years: '', copd_duration_years: '', comorbidities: '', bmi: '' });
   const h = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }}>
@@ -108,8 +128,8 @@ const BaselineForm = ({ onSubmit, submitting }) => {
 };
 
 // ── GOLD Classification Form ──
-const GoldForm = ({ onSubmit, submitting }) => {
-  const [form, setForm] = useState({ gold_grade: 'B', mmrc_score: '', cat_score: '', exacerbation_history: '' });
+const GoldForm = ({ onSubmit, submitting, initialData }) => {
+  const [form, setForm] = useState(initialData || { gold_grade: 'B', mmrc_score: '', cat_score: '', exacerbation_history: '' });
   const h = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }}>
@@ -144,8 +164,8 @@ const GoldForm = ({ onSubmit, submitting }) => {
 };
 
 // ── Spirometry Form ──
-const SpirometryForm = ({ onSubmit, submitting }) => {
-  const [form, setForm] = useState({ fev1: '', fvc: '', fev1_fvc_ratio: '', fev1_predicted: '', post_bronchodilator: 'no' });
+const SpirometryForm = ({ onSubmit, submitting, initialData }) => {
+  const [form, setForm] = useState(initialData || { fev1: '', fvc: '', fev1_fvc_ratio: '', fev1_predicted: '', post_bronchodilator: 'no' });
   const h = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }}>
@@ -184,8 +204,8 @@ const SpirometryForm = ({ onSubmit, submitting }) => {
 };
 
 // ── Gas Exchange History Form ──
-const GasExchangeForm = ({ onSubmit, submitting }) => {
-  const [form, setForm] = useState({ chronic_respiratory_failure: 'no', previous_abg_ph: '', previous_abg_paco2: '', previous_abg_pao2: '', on_ltot: 'no' });
+const GasExchangeForm = ({ onSubmit, submitting, initialData }) => {
+  const [form, setForm] = useState(initialData || { chronic_respiratory_failure: 'no', previous_abg_ph: '', previous_abg_paco2: '', previous_abg_pao2: '', on_ltot: 'no' });
   const h = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }}>
@@ -227,8 +247,8 @@ const GasExchangeForm = ({ onSubmit, submitting }) => {
 };
 
 // ── Current Symptoms Form ──
-const SymptomsForm = ({ onSubmit, submitting }) => {
-  const [form, setForm] = useState({
+const SymptomsForm = ({ onSubmit, submitting, initialData }) => {
+  const [form, setForm] = useState(initialData || {
     dyspnea_severity: 'moderate', cough: false, sputum_production: false, sputum_color: 'clear',
     wheezing: false, chest_tightness: false, accessory_muscle_use: false, cyanosis: false, notes: ''
   });

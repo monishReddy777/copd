@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { getDecisionSupport } from '../../../api/patients';
-import { ShieldAlert, AlertCircle, CheckCircle, TrendingUp, Activity, Stethoscope } from 'lucide-react';
+import { acceptTherapy } from '../../../api/therapy';
+import { ShieldAlert, AlertCircle, CheckCircle, TrendingUp, Zap, Stethoscope } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const DecisionSupportTab = ({ patientId }) => {
+const DecisionSupportTab = ({ patientId, onApproval }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [approving, setApproving] = useState(null);
+  const user = JSON.parse(localStorage.getItem('user'));
+  const role = user?.role || localStorage.getItem('role') || 'staff';
 
   useEffect(() => {
     fetchData();
@@ -16,21 +20,37 @@ const DecisionSupportTab = ({ patientId }) => {
       const { data: res } = await getDecisionSupport(patientId);
       setData(res);
     } catch {
+      // Fallback/Mock
       setData({
         has_data: true,
         risk_level: 'MODERATE',
         confidence_score: 68,
         action_level: 'WARNING',
-        recommendation: 'Monitor closely. Consider adjusting oxygen therapy if SpO2 drops below target. Prepare for potential NIV initiation.',
+        recommendation: 'Monitor closely. Consider adjusting oxygen therapy if SpO2 drops below target.',
         overall_status: 'Unstable',
         paco2_status: 'Rising',
         ph_status: 'Normal',
         spo2_status: 'Dropping',
         acidosis: 0,
-        hypercapnia: 1
+        hypercapnia: 1,
+        recommendations: []
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApprove = async (recId) => {
+    setApproving(recId);
+    try {
+      await acceptTherapy(patientId, recId);
+      toast.success('Therapy approved successfully');
+      if (onApproval) onApproval();
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to approve therapy');
+    } finally {
+      setApproving(null);
     }
   };
 
@@ -51,7 +71,7 @@ const DecisionSupportTab = ({ patientId }) => {
   const getStatusColor = (status) => {
     if (!status) return '#10B981';
     const s = status.toLowerCase();
-    if (['rising', 'dropping', 'worsening', 'critical'].includes(s)) return '#EF4444';
+    if (['rising', 'dropping', 'worsening', 'critical', 'low'].includes(s)) return '#EF4444';
     if (s === 'unstable') return '#F59E0B';
     return '#10B981';
   };
@@ -69,6 +89,10 @@ const DecisionSupportTab = ({ patientId }) => {
       </div>
     );
   }
+
+  const allPending = (data.recommendations || []).filter(r => r.status === 'pending');
+  const pendingRecs = allPending.length > 0 ? [allPending[0]] : [];
+  const pastRecs = (data.recommendations || []).filter(r => r.status !== 'pending');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -90,21 +114,55 @@ const DecisionSupportTab = ({ patientId }) => {
         </div>
       </div>
 
-      {/* Recommendation Card */}
-      <div className="card" style={{ background: getRiskBg(data.action_level), border: `1px solid ${getRiskColor(data.action_level)}30`, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', background: getRiskColor(data.action_level) }}></div>
-        <div style={{ paddingLeft: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <Stethoscope size={20} color={getRiskColor(data.action_level)} />
-            <span style={{ fontWeight: 700, color: getRiskColor(data.action_level), fontSize: '1.125rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-              {data.action_level}
-            </span>
+      {/* AI Therapy Decisions (Pending Approval) */}
+      {pendingRecs.length > 0 && (
+        <div className="card" style={{ background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%)', border: '1px solid var(--accent-primary)' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Zap size={20} color="var(--accent-primary)" fill="var(--accent-primary)" /> AI Therapy Decision
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {pendingRecs.map((rec) => (
+              <div key={rec.id} style={{ padding: '20px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Recommendation Details:</div>
+                  <span className="badge badge-warning" style={{ fontSize: '0.6875rem' }}>PENDING DOCTOR APPROVAL</span>
+                </div>
+                <p style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', margin: '0 0 20px 0', lineHeight: 1.6 }}>
+                  {rec.content}
+                </p>
+                {role === 'doctor' && (
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => handleApprove(rec.id)}
+                    disabled={approving === rec.id}
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    {approving === rec.id ? 'Approving...' : 'Approve & Apply Therapy'}
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
-          <p style={{ color: 'var(--text-primary)', lineHeight: 1.7, fontSize: '0.9375rem', margin: 0 }}>
-            {data.recommendation}
-          </p>
         </div>
-      </div>
+      )}
+
+      {/* Primary Recommendation summary if no pending */}
+      {pendingRecs.length === 0 && (
+        <div className="card" style={{ background: getRiskBg(data.action_level), border: `1px solid ${getRiskColor(data.action_level)}30`, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', background: getRiskColor(data.action_level) }}></div>
+          <div style={{ paddingLeft: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+              <Stethoscope size={20} color={getRiskColor(data.action_level)} />
+              <span style={{ fontWeight: 700, color: getRiskColor(data.action_level), fontSize: '1.125rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                {data.action_level}
+              </span>
+            </div>
+            <p style={{ color: 'var(--text-primary)', lineHeight: 1.7, fontSize: '0.9375rem', margin: 0 }}>
+              {data.recommendation}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Trend Summary */}
       <div className="card">
@@ -126,31 +184,22 @@ const DecisionSupportTab = ({ patientId }) => {
         </div>
       </div>
 
-      {/* Key Indicators */}
-      {(data.acidosis === 1 || data.hypercapnia === 1) && (
+      {/* Past Decisions History */}
+      {pastRecs.length > 0 && (
         <div className="card">
           <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertCircle size={18} color="var(--status-critical)" /> Key Indicators Detected
+            <CheckCircle size={18} color="#10B981" /> Decision History
           </h3>
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            {data.acidosis === 1 && (
-              <div style={{ flex: 1, minWidth: '250px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '20px', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <AlertCircle size={18} color="#EF4444" />
-                  <span style={{ fontWeight: 700, color: '#EF4444', fontSize: '1rem' }}>Respiratory Acidosis</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {pastRecs.map((rec) => (
+              <div key={rec.id} className="alert-card stable" style={{ margin: 0, opacity: 0.8 }}>
+                <div className="alert-icon green"><CheckCircle size={16} /></div>
+                <div className="alert-content">
+                  <h4 style={{ fontSize: '0.875rem', fontWeight: 600 }}>Approved On {new Date(rec.created_at).toLocaleDateString()}</h4>
+                  <p style={{ fontSize: '0.8125rem' }}>{rec.content}</p>
                 </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0 }}>pH &lt; 7.35 detected. Consider NIV initiation and close monitoring.</p>
               </div>
-            )}
-            {data.hypercapnia === 1 && (
-              <div style={{ flex: 1, minWidth: '250px', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '20px', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <AlertCircle size={18} color="#F59E0B" />
-                  <span style={{ fontWeight: 700, color: '#F59E0B', fontSize: '1rem' }}>Hypercapnia</span>
-                </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0 }}>PaCO2 &gt; 45 mmHg detected. Risk of CO2 retention with uncontrolled oxygen.</p>
-              </div>
-            )}
+            ))}
           </div>
         </div>
       )}

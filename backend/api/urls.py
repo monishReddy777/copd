@@ -41,6 +41,8 @@ urlpatterns = [
     path('patients/<int:pk>/spirometry/', SpirometryAPIView.as_view(), name='patient_spirometry'),
     path('patients/<int:pk>/oxygen-req/', OxygenRequirementAPIView.as_view(), name='patient_oxygen_req'),
     path('patients/<int:pk>/reassessment/', ReassessmentAPIView.as_view(), name='patient_reassessment'),
+    path('patients/<int:pk>/schedule-reassessment/', ReassessmentScheduleAPIView.as_view(), name='schedule_reassessment'),
+    path('staff-list/', StaffListAPIView.as_view(), name='staff_list'),
 
     # Additional frontend alias routes
     path('patients/<int:pk>/oxygen-status/', OxygenStatusAPIView.as_view(), name='patient_oxygen_status'),
@@ -85,4 +87,5 @@ urlpatterns = [
     path('patients/<int:pk>/therapy-recommendation/', DecisionSupportAPIView.as_view(), name='frontend_therapy_rec'),
     path('patients/<int:pk>/niv-recommendation/', DecisionSupportAPIView.as_view(), name='frontend_niv_rec'),
     path('patients/<int:pk>/escalation-criteria/', DecisionSupportAPIView.as_view(), name='frontend_escalation'),
+    path('patients/<int:pk>/accept-therapy/', AcceptTherapyAPIView.as_view(), name='accept_therapy'),
 ]
