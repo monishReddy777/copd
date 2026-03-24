@@ -4,12 +4,6 @@ from .models import *
 import re
 from django.core.exceptions import ValidationError as DjangoValidationError
 
-class CustomUserSerializer(serializers.ModelSerializer):
-    doctor_profile = DoctorSerializer(read_only=True)
-    staff_profile = StaffSerializer(read_only=True)
-    class Meta:
-        model = CustomUser
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone_number', 'department', 'is_approved', 'is_active', 'doctor_profile', 'staff_profile')
 
 class SignupSerializer(serializers.Serializer):
     name = serializers.CharField(required=False)
@@ -132,6 +126,13 @@ class StaffSerializer(serializers.ModelSerializer):
     class Meta:
         model = Staff
         fields = ('id', 'name', 'email', 'department', 'license_id', 'phone', 'status', 'is_active', 'is_approved')
+
+class CustomUserSerializer(serializers.ModelSerializer):
+    doctor_profile = DoctorSerializer(read_only=True)
+    staff_profile = StaffSerializer(read_only=True)
+    class Meta:
+        model = CustomUser
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone_number', 'department', 'is_approved', 'is_active', 'doctor_profile', 'staff_profile')
 
 class PatientSerializer(serializers.ModelSerializer):
     latest_vitals = serializers.SerializerMethodField()
