@@ -36,11 +36,22 @@ const Profile = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      const { data } = await updateProfile({ ...formData, role });
+      const parts = formData.name.split(' ');
+      const firstName = parts[0];
+      const lastName = parts.slice(1).join(' ');
+      
+      const payload = {
+        ...formData,
+        first_name: firstName,
+        last_name: lastName,
+        role
+      };
+      
+      const { data } = await updateProfile(payload);
       toast.success('Profile updated successfully');
       
       // Update AuthContext
-      const updatedUser = { ...user, name: formData.name, email: formData.email };
+      const updatedUser = { ...user, name: formData.name, email: formData.email, ...data };
       const token = localStorage.getItem('token');
       if (token) {
         login(token, updatedUser, role);

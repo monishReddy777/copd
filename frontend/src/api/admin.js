@@ -10,11 +10,13 @@ export const getAdminProfile = () => api.get('/auth/profile/');
 export const getAdminDoctors = () => api.get('/admin/doctors/');
 export const getAdminDoctorDetail = (id) => api.get(`/admin/doctors/${id}/`);
 export const toggleDoctorStatus = (id) => api.patch(`/admin/doctors/${id}/toggle/`);
+export const deleteDoctor = (id) => api.delete(`/admin/doctors/${id}/`);
 
 // Manage staff
 export const getAdminStaff = () => api.get('/admin/staff/');
 export const getAdminStaffDetail = (id) => api.get(`/admin/staff/${id}/`);
 export const toggleStaffStatus = (id) => api.patch(`/admin/staff/${id}/toggle/`);
+export const deleteStaff = (id) => api.delete(`/admin/staff/${id}/`);
 
 // Approvals
 export const getApprovalRequests = () => api.get('/admin/approval-requests/');
@@ -33,6 +35,8 @@ export const updateStaffAbg = (id, data) => api.post(`/patients/${id}/abg/`, dat
 
 // Reassessment
 export const getReassessments = () => api.get('/reassessment/');
-export const postScheduleReassessment = (data) => api.post('/schedule-reassessment/', data);
+export const postScheduleReassessment = (patientId, data) => api.post(`/patients/${patientId}/reassessment-schedule/`, data);
 export const getStaffChecklist = () => api.get('/staff-checklist/');
 export const getStaffReassessmentValues = (id) => api.get(`/patient/staff-reassessments/${id}/`);
+export const getReassessmentSchedule = (patientId) => api.get(`/patients/${patientId}/reassessment-schedule/`);
+export const getStaffList = () => api.get('/staff/list/');

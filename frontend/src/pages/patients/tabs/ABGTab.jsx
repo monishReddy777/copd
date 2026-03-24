@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { getPatientABGs, addABG } from '../../../api/patients';
+import { getPatientABGs, addABG, addSpirometry } from '../../../api/patients';
+import { useAuth } from '../../../hooks/useAuth';
 import { Droplets, Plus, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ABGTab = ({ patientId }) => {
+  const { role } = useAuth();
   const [abgList, setAbgList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showGoldForm, setShowGoldForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [goldSubmitting, setGoldSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     ph: '',
     paco2: '',
     pao2: '',
     hco3: '',
-    lactate: '',
-    base_excess: '',
     fio2: '21',
-    sample_type: 'Arterial'
   });
+  const [goldData, setGoldData] = useState({ fev1: '', fev1_fvc: '' });
 
   useEffect(() => {
     fetchABGs();
@@ -49,23 +51,41 @@ const ABGTab = ({ patientId }) => {
         paco2: parseFloat(formData.paco2),
         pao2: parseFloat(formData.pao2),
         hco3: parseFloat(formData.hco3),
-        lactate: formData.lactate ? parseFloat(formData.lactate) : null,
-        base_excess: formData.base_excess ? parseFloat(formData.base_excess) : null,
         fio2: parseFloat(formData.fio2),
-        sample_type: formData.sample_type
       };
       
       await addABG(payload);
       toast.success('ABG results recorded successfully');
-      
-      fetchABGs(); // Refresh list from server
+      fetchABGs();
       setShowForm(false);
-      setFormData({ ph: '', paco2: '', pao2: '', hco3: '', lactate: '', base_excess: '', fio2: '21', sample_type: 'Arterial' });
+      setFormData({ ph: '', paco2: '', pao2: '', hco3: '', fio2: '21' });
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to record ABG');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleGoldSubmit = async (e) => {
+    e.preventDefault();
+    setGoldSubmitting(true);
+    try {
+      await addSpirometry({ patient: patientId, fev1: parseFloat(goldData.fev1), fev1_fvc: parseFloat(goldData.fev1_fvc) });
+      toast.success('GOLD Classification recorded');
+      setShowGoldForm(false);
+      setGoldData({ fev1: '', fev1_fvc: '' });
+    } catch (error) {
+      toast.error('Failed to save GOLD classification');
+    } finally {
+      setGoldSubmitting(false);
+    }
+  };
+
+  const getGoldStage = (fev1) => {
+    if (fev1 >= 80) return { stage: 'GOLD 1 (Mild)', color: 'var(--status-stable)' };
+    if (fev1 >= 50) return { stage: 'GOLD 2 (Moderate)', color: 'var(--status-warning)' };
+    if (fev1 >= 30) return { stage: 'GOLD 3 (Severe)', color: 'var(--status-warning)' };
+    return { stage: 'GOLD 4 (Very Severe)', color: 'var(--status-critical)' };
   };
 
   const getPHStatus = (ph) => {
@@ -83,118 +103,158 @@ const ABGTab = ({ patientId }) => {
   if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}><div className="spinner"></div></div>;
 
   return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Arterial Blood Gas (ABG) History</h3>
-        {!showForm && (
-          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-            <Plus size={16} /> New ABG Entry
-          </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* ABG Entry Card */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Arterial Blood Gas (ABG) Records</h3>
+          {!showForm && (
+            <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+              <Plus size={16} /> New ABG Entry
+            </button>
+          )}
+        </div>
+
+        {showForm && (
+          <div style={{ background: 'var(--bg-secondary)', padding: '24px', borderRadius: 'var(--radius-md)', marginBottom: '24px', border: '1px solid var(--border)' }}>
+            <h4 style={{ marginBottom: '16px', fontWeight: 600 }}>Record ABG Results</h4>
+            <form onSubmit={handleSubmit}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">pH</label>
+                  <input type="number" step="0.01" name="ph" className="form-input" value={formData.ph} onChange={handleChange} required placeholder="7.35–7.45" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">PaCO2 (mmHg)</label>
+                  <input type="number" step="0.1" name="paco2" className="form-input" value={formData.paco2} onChange={handleChange} required placeholder="35–45" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">PaO2 (mmHg)</label>
+                  <input type="number" step="0.1" name="pao2" className="form-input" value={formData.pao2} onChange={handleChange} required placeholder="75–100" />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">HCO3 (mEq/L)</label>
+                  <input type="number" step="0.1" name="hco3" className="form-input" value={formData.hco3} onChange={handleChange} required placeholder="22–26" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">FiO2 (%)</label>
+                  <input type="number" step="0.1" name="fio2" className="form-input" value={formData.fio2} onChange={handleChange} required placeholder="21" />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? 'Saving...' : 'Save Results'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {abgList.length === 0 ? (
+          <div className="empty-state">
+            <Droplets className="empty-state-icon" />
+            <h3>No ABG records</h3>
+            <p>Add the first ABG analysis for this patient.</p>
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>pH</th>
+                  <th>PaCO2</th>
+                  <th>PaO2</th>
+                  <th>HCO3</th>
+                  <th>FiO2</th>
+                </tr>
+              </thead>
+              <tbody>
+                {abgList.map(abg => (
+                  <tr key={abg.id}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{new Date(abg.created_at).toLocaleDateString()}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(abg.created_at).toLocaleTimeString()}</div>
+                    </td>
+                    <td>{getPHStatus(abg.ph)}</td>
+                    <td>{getCO2Status(abg.paco2)}</td>
+                    <td style={{ fontWeight: 600 }}>{abg.pao2} mmHg</td>
+                    <td style={{ fontWeight: 600 }}>{abg.hco3} mEq/L</td>
+                    <td>{abg.fio2}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      {showForm && (
-        <div style={{ background: 'var(--bg-secondary)', padding: '24px', borderRadius: 'var(--radius-md)', marginBottom: '24px', border: '1px solid var(--border)' }}>
-          <h4 style={{ marginBottom: '16px', fontWeight: 600 }}>Record ABG Results</h4>
-          <form onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">pH</label>
-                <input type="number" step="0.01" name="ph" className="form-input" value={formData.ph} onChange={handleChange} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">PaCO2 (mmHg)</label>
-                <input type="number" step="0.1" name="paco2" className="form-input" value={formData.paco2} onChange={handleChange} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">PaO2 (mmHg)</label>
-                <input type="number" step="0.1" name="pao2" className="form-input" value={formData.pao2} onChange={handleChange} required />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">HCO3 (mEq/L)</label>
-                <input type="number" step="0.1" name="hco3" className="form-input" value={formData.hco3} onChange={handleChange} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Lactate (mmol/L)</label>
-                <input type="number" step="0.1" name="lactate" className="form-input" value={formData.lactate} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Base Excess</label>
-                <input type="number" step="0.1" name="base_excess" className="form-input" value={formData.base_excess} onChange={handleChange} />
-              </div>
-            </div>
-            
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">FiO2 (%)</label>
-                <input type="number" step="0.1" name="fio2" className="form-input" value={formData.fio2} onChange={handleChange} required />
-              </div>
-              <div className="form-group" style={{ flex: 2 }}>
-                <label className="form-label">Sample Type</label>
-                <select name="sample_type" className="form-select" value={formData.sample_type} onChange={handleChange} required>
-                  <option value="Arterial">Arterial (ABG)</option>
-                  <option value="Venous">Venous (VBG)</option>
-                  <option value="Capillary">Capillary (CBG)</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-              <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Saving...' : 'Save Results'}
-              </button>
-            </div>
-          </form>
+      {/* GOLD Classification Card */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600 }}>GOLD Classification</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '4px' }}>
+              Based on post-bronchodilator FEV1 (% predicted)
+            </p>
+          </div>
+          {!showGoldForm && (
+            <button className="btn btn-outline" onClick={() => setShowGoldForm(true)}>
+              <Plus size={16} /> Record FEV1
+            </button>
+          )}
         </div>
-      )}
 
-      {abgList.length === 0 ? (
-        <div className="empty-state">
-          <Droplets className="empty-state-icon" />
-          <h3>No ABG records</h3>
-          <p>Add the first ABG analysis for this patient.</p>
+        {showGoldForm && (
+          <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '16px' }}>
+            <form onSubmit={handleGoldSubmit}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">FEV1 (% predicted)</label>
+                  <input type="number" step="0.1" className="form-input" value={goldData.fev1} onChange={e => setGoldData({...goldData, fev1: e.target.value})} required placeholder="e.g. 65" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">FEV1/FVC ratio</label>
+                  <input type="number" step="0.01" className="form-input" value={goldData.fev1_fvc} onChange={e => setGoldData({...goldData, fev1_fvc: e.target.value})} required placeholder="e.g. 0.65" />
+                </div>
+              </div>
+              {goldData.fev1 && (
+                <div style={{ marginBottom: '12px', padding: '10px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                  <span style={{ color: getGoldStage(parseFloat(goldData.fev1)).color, fontWeight: 700 }}>
+                    {getGoldStage(parseFloat(goldData.fev1)).stage}
+                  </span>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setShowGoldForm(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={goldSubmitting}>
+                  {goldSubmitting ? 'Saving...' : 'Save GOLD'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px' }}>
+          {[
+            { stage: 'GOLD 1', label: 'Mild', fev1: 'FEV1 ≥ 80%', color: 'var(--status-stable)' },
+            { stage: 'GOLD 2', label: 'Moderate', fev1: '50% ≤ FEV1 < 80%', color: '#f59e0b' },
+            { stage: 'GOLD 3', label: 'Severe', fev1: '30% ≤ FEV1 < 50%', color: '#ef8c00' },
+            { stage: 'GOLD 4', label: 'Very Severe', fev1: 'FEV1 < 30%', color: 'var(--status-critical)' },
+          ].map(g => (
+            <div key={g.stage} style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', borderLeft: `4px solid ${g.color}` }}>
+              <div style={{ fontWeight: 700, color: g.color, fontSize: '0.875rem' }}>{g.stage}</div>
+              <div style={{ fontWeight: 600, fontSize: '1rem', marginTop: '4px' }}>{g.label}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>{g.fev1}</div>
+            </div>
+          ))}
         </div>
-      ) : (
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Date & Time</th>
-                <th>pH</th>
-                <th>PaCO2</th>
-                <th>PaO2 / FiO2</th>
-                <th>HCO3 / BE</th>
-                <th>Lactate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {abgList.map(abg => (
-                <tr key={abg.id}>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{new Date(abg.recorded_at).toLocaleDateString()}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(abg.recorded_at).toLocaleTimeString()} ({abg.sample_type})</div>
-                  </td>
-                  <td>{getPHStatus(abg.ph)}</td>
-                  <td>{getCO2Status(abg.paco2)}</td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{abg.pao2}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>FiO2: {abg.fio2}%</div>
-                  </td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{abg.hco3}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>BE: {abg.base_excess || '--'}</div>
-                  </td>
-                  <td>{abg.lactate || '--'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      </div>
     </div>
   );
 };

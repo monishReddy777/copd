@@ -68,19 +68,20 @@ const PatientDetail = () => {
 
   if (loading || !patient) return <div className="loader-container"><div className="spinner"></div></div>;
 
+  // Build tabs based on role: staff only sees Overview, Vitals, ABG Records
   const tabs = [
     { key: 'overview', label: 'Overview' },
     { key: 'vitals', label: 'Vitals' },
     { key: 'abg', label: 'ABG Records' },
-    { key: 'oxygen', label: 'O₂ Status' },
-    { key: 'clinical', label: 'Clinical Data' },
     ...(role === 'doctor' ? [
+      { key: 'oxygen', label: 'O₂ Status' },
+      { key: 'clinical', label: 'Clinical Data' },
       { key: 'therapy', label: 'AI Therapy' },
       { key: 'ai-analysis', label: 'AI Analysis' },
       { key: 'decision', label: 'Decision Support' },
+      { key: 'trends', label: 'ABG Trends' },
+      { key: 'escalation', label: 'Escalation' },
     ] : []),
-    { key: 'trends', label: 'ABG Trends' },
-    { key: 'escalation', label: 'Escalation' },
   ];
 
   return (
@@ -111,7 +112,7 @@ const PatientDetail = () => {
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Admitted On</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
-              <Calendar size={14} /> {new Date(patient.admission_date).toLocaleDateString()}
+              <Calendar size={14} /> {new Date(patient.admission_date || patient.created_at).toLocaleDateString()}
             </div>
           </div>
         </div>

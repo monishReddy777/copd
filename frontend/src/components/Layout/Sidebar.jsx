@@ -3,8 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { 
   Home, Users, Activity, Settings, Bell, 
-  LogOut, ClipboardList, Shield, FileText,
-  UserPlus, Search, Stethoscope, HeartPulse, HelpCircle
+  LogOut, Shield, FileText,
+  UserPlus, Stethoscope, HeartPulse
 } from 'lucide-react';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
@@ -20,14 +20,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     { to: '/doctor/dashboard', icon: <Home className="nav-icon" />, label: 'Dashboard' },
     { to: '/doctor/patients', icon: <Users className="nav-icon" />, label: 'My Patients' },
     { to: '/doctor/alerts', icon: <Bell className="nav-icon" />, label: 'Alerts' },
-    { to: '/notifications', icon: <Bell className="nav-icon" />, label: 'Notifications' },
   ];
 
   const staffLinks = [
     { to: '/staff/dashboard', icon: <Home className="nav-icon" />, label: 'Dashboard' },
     { to: '/staff/patients', icon: <Users className="nav-icon" />, label: 'Patient List' },
     { to: '/staff/alerts', icon: <Bell className="nav-icon" />, label: 'Alerts' },
-    { to: '/notifications', icon: <Bell className="nav-icon" />, label: 'Notifications' },
   ];
 
   const adminLinks = [
@@ -35,7 +33,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     { to: '/admin/doctors', icon: <Stethoscope className="nav-icon" />, label: 'Manage Doctors' },
     { to: '/admin/staff', icon: <HeartPulse className="nav-icon" />, label: 'Manage Staff' },
     { to: '/admin/approvals', icon: <Shield className="nav-icon" />, label: 'Approvals' },
-    { to: '/notifications', icon: <Bell className="nav-icon" />, label: 'Notifications' },
   ];
 
   const getLinks = () => {
@@ -94,11 +91,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           <div className="sidebar-section-title">Preferences</div>
           <NavLink to={getProfileLink()} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Settings className="nav-icon" />
-            <span className="nav-label">Settings</span>
-          </NavLink>
-          <NavLink to="/settings/help" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <HelpCircle className="nav-icon" />
-            <span className="nav-label">Help & Support</span>
+            <span className="nav-label">Profile & Settings</span>
           </NavLink>
           <div className="nav-item" onClick={handleLogout}>
             <LogOut className="nav-icon" />

@@ -5,9 +5,11 @@ import re
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 class CustomUserSerializer(serializers.ModelSerializer):
+    doctor_profile = DoctorSerializer(read_only=True)
+    staff_profile = StaffSerializer(read_only=True)
     class Meta:
         model = CustomUser
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone_number', 'department', 'is_approved', 'is_active')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone_number', 'department', 'is_approved', 'is_active', 'doctor_profile', 'staff_profile')
 
 class SignupSerializer(serializers.Serializer):
     name = serializers.CharField(required=False)

@@ -218,13 +218,42 @@ class VerifyOTPAPIView(APIView):
 class ProfileAPIView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):
-        return Response(CustomUserSerializer(request.user).data)
+        serializer = CustomUserSerializer(request.user)
+        return Response(serializer.data)
+        
     def put(self, request):
-        serializer = CustomUserSerializer(request.user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = request.user
+        role = user.role
+        data = request.data
+        
+        # Update CustomUser fields
+        if 'email' in data: user.email = data['email']
+        if 'first_name' in data: user.first_name = data['first_name']
+        if 'last_name' in data: user.last_name = data['last_name']
+        if 'phone_number' in data: user.phone_number = data['phone_number']
+        user.save()
+        
+        # Update Role-specific profile
+        if role == 'doctor':
+            try:
+                doc = user.doctor_profile
+                if 'name' in data: doc.name = data['name']
+                if 'specialization' in data: doc.specialization = data['specialization']
+                if 'license_number' in data: doc.license_number = data['license_number']
+                if 'phone' in data: doc.phone = data['phone']
+                doc.save()
+            except Doctor.DoesNotExist: pass
+        elif role == 'staff':
+            try:
+                stf = user.staff_profile
+                if 'name' in data: stf.name = data['name']
+                if 'department' in data: stf.department = data['department']
+                if 'license_id' in data: stf.license_id = data['license_id']
+                if 'phone' in data: stf.phone = data['phone']
+                stf.save()
+            except Staff.DoesNotExist: pass
+            
+        return Response(CustomUserSerializer(user).data)
 
 # --- ADMIN MODULE ---
 class AdminDashboardAPIView(APIView):
@@ -253,6 +282,17 @@ class AdminDoctorDetailAPIView(APIView):
             return Response(CustomUserSerializer(doc).data)
         except CustomUser.DoesNotExist:
             return Response(status=404)
+            
+    def delete(self, request, pk):
+        if request.user.role != 'admin': return Response(status=403)
+        try:
+            doc_user = CustomUser.objects.get(id=pk, role='doctor')
+            # Deleting the user will cascade delete the doctor profile if set to CASCADE, 
+            # or we handle it based on on_delete in models.
+            doc_user.delete()
+            return Response({"message": "Doctor removed successfully"}, status=204)
+        except CustomUser.DoesNotExist:
+            return Response(status=404)
 
 class AdminStaffListAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -268,6 +308,15 @@ class AdminStaffDetailAPIView(APIView):
         try:
             staff = CustomUser.objects.get(id=pk, role='staff')
             return Response(CustomUserSerializer(staff).data)
+        except CustomUser.DoesNotExist:
+            return Response(status=404)
+            
+    def delete(self, request, pk):
+        if request.user.role != 'admin': return Response(status=403)
+        try:
+            staff_user = CustomUser.objects.get(id=pk, role='staff')
+            staff_user.delete()
+            return Response({"message": "Staff removed successfully"}, status=204)
         except CustomUser.DoesNotExist:
             return Response(status=404)
 
@@ -412,16 +461,15 @@ class VitalsAPIView(APIView):
             # AI LOGIC: SpO2
             spo2 = vitals.spo2
             if spo2 < 88:
-                Alert.objects.create(patient=p, severity='critical', message=f'Critical SpO2 Drop: {spo2}%')
+                Alert.objects.create(patient=p, severity='critical', alert_type='SpO2 Drop', message=f'Critical SpO2 Drop: {spo2}% for patient {p.full_name}')
                 p.status = 'critical'
                 # Notify Doctors
                 for doc in CustomUser.objects.filter(role='doctor'):
-                    Notification.objects.create(user=doc, title='Critical Alert', message=f'Patient {p.full_name} SpO2 < 88%')
+                    Notification.objects.create(user=doc, title='Critical SpO2 Alert', message=f'Patient {p.full_name} SpO2 dropped below 88% ({spo2}%)')
             elif 88 <= spo2 <= 92:
-                Alert.objects.create(patient=p, severity='warning', message=f'Warning SpO2: {spo2}%')
+                Alert.objects.create(patient=p, severity='warning', alert_type='SpO2 Falling', message=f'Warning SpO2: {spo2}% for patient {p.full_name}')
                 p.status = 'warning'
             else:
-                Alert.objects.create(patient=p, severity='normal', message=f'Normal SpO2: {spo2}%')
                 p.status = 'stable'
             p.save()
 
@@ -1149,36 +1197,20 @@ class ResetPasswordAPIView(APIView):
 class UpdateProfileAPIView(APIView):
     """
     POST /api/update-profile/
-    Body: { "email": "...", "role": "...", "name": "...", "new_email": "..." }
-    Updates name (and optionally email) for doctor or staff.
+    Securely updates profile of current authenticated user.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
+    def put(self, request):
+        # We redirect PUT here to the common ProfileAPIView put logic or implement it here
+        # For compatibility with frontend call, we implement PUT.
+        view = ProfileAPIView()
+        return view.put(request)
+        
     def post(self, request):
-        email = request.data.get("email")
-        role = request.data.get("role")
-        name = request.data.get("name")
-        new_email = request.data.get("new_email", email)
-
-        if not email or not role or not name:
-            return Response({"error": "email, role, and name are required"}, status=400)
-
-        if role == "doctor":
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "UPDATE doctor SET name = %s, email = %s WHERE email = %s",
-                    [name, new_email, email]
-                )
-        elif role == "staff":
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "UPDATE staff SET name = %s, email = %s WHERE email = %s",
-                    [name, new_email, email]
-                )
-        else:
-            return Response({"error": "Invalid role"}, status=400)
-
-        return Response({"message": "Profile updated successfully"}, status=200)
+        # Compatibility for POST if used
+        view = ProfileAPIView()
+        return view.put(request)
 
 
 # --- ADDITIONAL FRONTEND-REQUIRED VIEWS ---
@@ -1282,7 +1314,21 @@ class ReassessmentScheduleAPIView(APIView):
 
         serializer = ReassessmentScheduleSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
+            schedule = serializer.save()
+            
+            # Notify Assigned Staff
+            assigned_staff_id = data.get('assigned_staff')
+            if assigned_staff_id:
+                try:
+                    staff_user = CustomUser.objects.get(id=assigned_staff_id)
+                    Notification.objects.create(
+                        user=staff_user,
+                        title='Reassessment Scheduled',
+                        message=f'Dr. {request.user.username} scheduled a clinical reassessment for {p.full_name} in {interval} minutes.'
+                    )
+                except CustomUser.DoesNotExist:
+                    pass
+                    
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
 
@@ -1306,32 +1352,43 @@ class AcceptTherapyAPIView(APIView):
             # Logic to extract device and flow from recommendation content
             # Or use specific fields if added to Recommendation model.
             # For now, we assume simple status update and patient field updates.
-            rec.status = 'approved'
+            rec.status = 'accepted'
+            
+            # If selected_device was provided (doctor selection/override)
+            selected_device = request.data.get('selected_device')
+            flow_rate = request.data.get('flow_rate')
+            is_override = request.data.get('is_override', False)
+            override_reason = request.data.get('override_reason')
+            
+            if selected_device:
+                p.current_device = selected_device
+                p.current_flow_rate = flow_rate or p.current_flow_rate
+                if is_override:
+                    rec.status = 'overridden'
+                    rec.override_reason = override_reason
+            else:
+                # Fallback to old regex/string matching if not explicitly provided
+                if 'HFNC' in rec.content:
+                    p.current_device = 'High-Flow Nasal Cannula (HFNC)'
+                    p.current_flow_rate = '40L/min, 40%'
+                elif 'Venturi' in rec.content:
+                    p.current_device = 'Venturi Mask'
+                    p.current_flow_rate = '35%'
+                elif 'Nasal Cannula' in rec.content:
+                    p.current_device = 'Nasal Cannula'
+                    p.current_flow_rate = '2L/min'
+                elif 'Non-Rebreather' in rec.content:
+                    p.current_device = 'Non-Rebreather Mask'
+                    p.current_flow_rate = '15L/min'
+            
             rec.save()
-            
-            # Update patient's current therapy based on the recommendation
-            # (In a real app, this would be more structured)
-            # We'll try to parse the content or use dummy updates for demo.
-            if 'HFNC' in rec.content:
-                p.current_device = 'High Flow Nasal Cannula (HFNC)'
-                p.current_flow_rate = '40L/min, 40%'
-            elif 'Venturi' in rec.content:
-                p.current_device = 'Venturi Mask'
-                p.current_flow_rate = '35%'
-            elif 'Nasal Cannula' in rec.content:
-                p.current_device = 'Nasal Cannula'
-                p.current_flow_rate = '2L/min'
-            elif 'Non-Rebreather' in rec.content:
-                p.current_device = 'Non-Rebreather Mask'
-                p.current_flow_rate = '15L/min'
-            
+            p.therapy_approved_at = timezone.now()
             p.save()
             
-            # Create a notification for the patient/staff about therapy change
             Notification.objects.create(
-                user=request.user, # The doctor who approved
-                title="Therapy Changed",
-                message=f"Therapy for {p.full_name} updated to {p.current_device}."
+                user=request.user,
+                title="Therapy Approved",
+                message=f"Therapy for {p.full_name} set to {p.current_device}."
             )
             
             return Response({"message": "Therapy approved and applied."})
@@ -1349,11 +1406,33 @@ class ABGTrendsAPIView(APIView):
             return Response(status=404)
 
         # Get records from both ABGData and Vitals
-        abg_records = ABGData.objects.filter(patient=p).order_by('-created_at')[:20]
-        vitals_records = Vitals.objects.filter(patient=p).order_by('-created_at')[:40]
+        abg_records = ABGData.objects.filter(patient=p).order_by('created_at')
+        vitals_records = Vitals.objects.filter(patient=p).order_by('created_at')
         
         trends = []
+        # Merge and sort by time
+        for r in abg_records:
+            trends.append({
+                "timestamp": r.created_at,
+                "ph": r.ph,
+                "paco2": r.paco2,
+                "pao2": r.pao2,
+                "hco3": r.hco3,
+                "type": "abg"
+            })
         
+        # Add SpO2 from vitals to the trend
+        for v in vitals_records:
+            # Simple matching or just include all
+            trends.append({
+                "timestamp": v.created_at,
+                "spo2": v.spo2,
+                "hr": v.heart_rate,
+                "type": "vitals"
+            })
+            
+        trends.sort(key=lambda x: x['timestamp'])
+        return Response({"trends": trends})
         # Add ABG records
         for a in abg_records:
             trends.append({

@@ -26,12 +26,13 @@ const StaffProfile = () => {
     try {
       const { data } = await getStaffProfile();
       setProfile(data);
+      const stf = data.staff_profile || {};
       setFormData({ 
-        name: data.name || user.name, 
-        email: data.email || user.email,
-        phone_number: data.phone_number || '',
-        department: data.department || '',
-        staff_id: data.staff_id || ''
+        name: stf.name || `${data.first_name} ${data.last_name}`.trim(), 
+        email: data.email,
+        phone_number: data.phone_number || stf.phone || '',
+        department: stf.department || '',
+        staff_id: stf.license_id || ''
       });
     } catch (error) {
       toast.error('Failed to load profile');
@@ -45,10 +46,22 @@ const StaffProfile = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      await updateProfile({ ...formData, role });
+      const parts = formData.name.split(' ');
+      const firstName = parts[0];
+      const lastName = parts.slice(1).join(' ');
+      
+      const payload = {
+        ...formData,
+        first_name: firstName,
+        last_name: lastName,
+        license_id: formData.staff_id, // Map frontend staff_id to backend license_id
+        role
+      };
+      
+      const { data } = await updateProfile(payload);
       toast.success('Profile updated successfully');
       
-      const updatedUser = { ...user, name: formData.name, email: formData.email };
+      const updatedUser = { ...user, name: formData.name, email: formData.email, ...data };
       const token = localStorage.getItem('token');
       if (token) login(token, updatedUser, role);
     } catch (error) {

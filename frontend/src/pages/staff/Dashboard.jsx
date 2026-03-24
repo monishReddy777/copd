@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 const StaffDashboard = () => {
   const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
-  const [stats, setStats] = useState({ patient_count: 0, pending_vitals: 0, abg_needed: 0 });
+  const [stats, setStats] = useState({ patient_count: 0, pending_vitals: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,19 +17,12 @@ const StaffDashboard = () => {
 
   const fetchPatients = async () => {
     try {
-      const [patientsRes, alertsRes] = await Promise.all([
-        getPatients(),
-        getStaffAlerts().catch(() => ({ data: [] }))
-      ]);
-      
+      const patientsRes = await getPatients();
       const patientsList = patientsRes.data?.results || patientsRes.data || [];
-      const alertsList = alertsRes.data?.results || alertsRes.data || [];
-      
       setPatients(patientsList.slice(0, 5));
       setStats({
         patient_count: patientsList.length,
         pending_vitals: patientsList.filter(p => p.status === 'warning' || p.status === 'critical').length,
-        abg_needed: alertsList.filter(a => a.message && a.message.includes('ABG')).length
       });
     } catch (error) {
       toast.error('Failed to load pending tasks');
@@ -68,10 +61,10 @@ const StaffDashboard = () => {
 
         <div className="stat-card" onClick={() => navigate('/staff/alerts')}>
           <div className="stat-card-icon purple">
-            <HeartPulse size={24} />
+            <AlertCircle size={24} />
           </div>
-          <div className="stat-card-value">{stats.abg_needed}</div>
-          <div className="stat-card-label">ABG Draws Needed</div>
+          <div className="stat-card-value" id="staff-alerts-count">—</div>
+          <div className="stat-card-label">Active Alerts</div>
         </div>
       </div>
 
@@ -83,7 +76,7 @@ const StaffDashboard = () => {
             <table>
               <thead>
                 <tr>
-                  <th>Time Due</th>
+                  <th>Admit Date</th>
                   <th>Patient Name</th>
                   <th>Location</th>
                   <th>Task</th>
@@ -91,11 +84,13 @@ const StaffDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {patients.map(patient => (
+                {patients.length === 0 ? (
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>No patients assigned</td></tr>
+                ) : patients.map(patient => (
                   <tr key={patient.id}>
                     <td>
-                      <span style={{ fontWeight: 600, color: 'var(--status-warning)' }}>
-                        {patient.next_vitals_due || 'ASAP'}
+                      <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {patient.created_at ? new Date(patient.created_at).toLocaleDateString() : 'N/A'}
                       </span>
                     </td>
                     <td><div style={{ fontWeight: 600 }}>{patient.full_name}</div></td>

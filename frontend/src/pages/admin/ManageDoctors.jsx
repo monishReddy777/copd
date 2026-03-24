@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { getAdminDoctors, toggleDoctorStatus } from '../../api/admin';
-import { Search, Stethoscope, Power, CheckCircle, XCircle } from 'lucide-react';
+import { getAdminDoctors, toggleDoctorStatus, deleteDoctor } from '../../api/admin';
+import { Search, Stethoscope, CheckCircle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ManageDoctors = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
     fetchDoctors();
@@ -18,10 +19,7 @@ const ManageDoctors = () => {
       setDoctors(data.results || data);
     } catch (error) {
       toast.error('Failed to load doctors list');
-      setDoctors([
-        { id: 1, name: 'Dr. John Doe', email: 'john@hospital.com', specialization: 'Pulmonology', is_active: true, is_approved: true },
-        { id: 2, name: 'Dr. Jane Smith', email: 'jane@hospital.com', specialization: 'Internal Medicine', is_active: false, is_approved: true }
-      ]);
+      setDoctors([]);
     } finally {
       setLoading(false);
     }
@@ -30,7 +28,7 @@ const ManageDoctors = () => {
   const handleToggleStatus = async (id, currentStatus) => {
     try {
       await toggleDoctorStatus(id);
-      setDoctors(doctors.map(doc => 
+      setDoctors(doctors.map(doc =>
         doc.id === id ? { ...doc, is_active: !currentStatus } : doc
       ));
       toast.success(`Doctor marked as ${!currentStatus ? 'Active' : 'Inactive'}`);
@@ -39,13 +37,46 @@ const ManageDoctors = () => {
     }
   };
 
-  const filteredDoctors = doctors.filter(doctor => 
-    doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    doctor.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleDelete = async (id) => {
+    try {
+      await deleteDoctor(id);
+      setDoctors(doctors.filter(doc => doc.id !== id));
+      setConfirmDelete(null);
+      toast.success('Doctor removed successfully');
+    } catch (error) {
+      toast.error('Failed to remove doctor');
+    }
+  };
+
+  const filteredDoctors = doctors.filter(doctor =>
+    (doctor.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (doctor.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <>
+      {/* Confirm Delete Modal */}
+      {confirmDelete && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div className="card" style={{ maxWidth: '400px', width: '90%' }}>
+            <h3 style={{ marginBottom: '12px' }}>Confirm Remove Doctor</h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+              Are you sure you want to remove <strong>{confirmDelete.name}</strong>? This will revoke their login access.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" onClick={() => setConfirmDelete(null)}>Cancel</button>
+              <button className="btn btn-primary" style={{ background: 'var(--status-critical)', borderColor: 'var(--status-critical)' }}
+                onClick={() => handleDelete(confirmDelete.id)}>
+                Remove Doctor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <div>
           <h1>Manage Doctors</h1>
@@ -54,9 +85,9 @@ const ManageDoctors = () => {
         <div className="page-header-actions">
           <div className="search-box">
             <Search className="search-icon" />
-            <input 
-              type="text" 
-              placeholder="Search doctors..." 
+            <input
+              type="text"
+              placeholder="Search doctors..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -76,6 +107,7 @@ const ManageDoctors = () => {
               <tr>
                 <th>Doctor Details</th>
                 <th>Specialization</th>
+                <th>License No.</th>
                 <th>Approval Status</th>
                 <th>Account Status</th>
                 <th>Actions</th>
@@ -97,6 +129,7 @@ const ManageDoctors = () => {
                       </div>
                     </td>
                     <td>{doctor.specialization || 'N/A'}</td>
+                    <td style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{doctor.license_number || 'N/A'}</td>
                     <td>
                       {doctor.is_approved ? (
                         <span className="badge badge-success"><CheckCircle size={12} /> Approved</span>
@@ -112,19 +145,29 @@ const ManageDoctors = () => {
                       )}
                     </td>
                     <td>
-                      <button 
-                        className={`btn btn-sm ${doctor.is_active ? 'btn-outline' : 'btn-primary'}`}
-                        onClick={() => handleToggleStatus(doctor.id, doctor.is_active)}
-                        style={{ padding: '6px 12px' }}
-                      >
-                        {doctor.is_active ? 'Deactivate' : 'Activate'}
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          className={`btn btn-sm ${doctor.is_active ? 'btn-outline' : 'btn-primary'}`}
+                          onClick={() => handleToggleStatus(doctor.id, doctor.is_active)}
+                          style={{ padding: '6px 12px' }}
+                        >
+                          {doctor.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => setConfirmDelete(doctor)}
+                          style={{ padding: '6px 10px', background: 'rgba(239,68,68,0.1)', color: 'var(--status-critical)', border: '1px solid rgba(239,68,68,0.3)' }}
+                          title="Remove Doctor"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="5">
+                  <td colSpan="6">
                     <div className="empty-state">
                       <Stethoscope className="empty-state-icon" />
                       <h3>No doctors found</h3>

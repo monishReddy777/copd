@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { getAdminStaff, toggleStaffStatus } from '../../api/admin';
-import { Search, HeartPulse, CheckCircle } from 'lucide-react';
+import { getAdminStaff, toggleStaffStatus, deleteStaff } from '../../api/admin';
+import { Search, HeartPulse, CheckCircle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ManageStaff = () => {
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
     fetchStaff();
@@ -18,10 +19,7 @@ const ManageStaff = () => {
       setStaffList(data.results || data);
     } catch (error) {
       toast.error('Failed to load staff list');
-      setStaffList([
-        { id: 1, name: 'Sarah Nurse', email: 'sarah@hospital.com', department: 'ICU', staff_id: 'STF-001', is_active: true, is_approved: true },
-        { id: 2, name: 'Mike Tech', email: 'mike@hospital.com', department: 'Emergency', staff_id: 'STF-002', is_active: false, is_approved: true }
-      ]);
+      setStaffList([]);
     } finally {
       setLoading(false);
     }
@@ -30,7 +28,7 @@ const ManageStaff = () => {
   const handleToggleStatus = async (id, currentStatus) => {
     try {
       await toggleStaffStatus(id);
-      setStaffList(staffList.map(staff => 
+      setStaffList(staffList.map(staff =>
         staff.id === id ? { ...staff, is_active: !currentStatus } : staff
       ));
       toast.success(`Staff marked as ${!currentStatus ? 'Active' : 'Inactive'}`);
@@ -39,14 +37,47 @@ const ManageStaff = () => {
     }
   };
 
-  const filteredStaff = staffList.filter(staff => 
-    staff.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    staff.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const handleDelete = async (id) => {
+    try {
+      await deleteStaff(id);
+      setStaffList(staffList.filter(s => s.id !== id));
+      setConfirmDelete(null);
+      toast.success('Staff member removed successfully');
+    } catch (error) {
+      toast.error('Failed to remove staff member');
+    }
+  };
+
+  const filteredStaff = staffList.filter(staff =>
+    (staff.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (staff.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (staff.department && staff.department.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
     <>
+      {/* Confirm Delete Modal */}
+      {confirmDelete && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div className="card" style={{ maxWidth: '400px', width: '90%' }}>
+            <h3 style={{ marginBottom: '12px' }}>Confirm Remove Staff</h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+              Are you sure you want to remove <strong>{confirmDelete.name}</strong>? This will revoke their login access.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" onClick={() => setConfirmDelete(null)}>Cancel</button>
+              <button className="btn btn-primary" style={{ background: 'var(--status-critical)', borderColor: 'var(--status-critical)' }}
+                onClick={() => handleDelete(confirmDelete.id)}>
+                Remove Staff
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <div>
           <h1>Manage Staff</h1>
@@ -55,9 +86,9 @@ const ManageStaff = () => {
         <div className="page-header-actions">
           <div className="search-box">
             <Search className="search-icon" />
-            <input 
-              type="text" 
-              placeholder="Search staff..." 
+            <input
+              type="text"
+              placeholder="Search staff..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -99,7 +130,7 @@ const ManageStaff = () => {
                     </td>
                     <td>
                       <div>{staff.department || 'N/A'}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{staff.staff_id || 'N/A'}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{staff.license_id || 'N/A'}</div>
                     </td>
                     <td>
                       {staff.is_approved ? (
@@ -116,13 +147,23 @@ const ManageStaff = () => {
                       )}
                     </td>
                     <td>
-                      <button 
-                        className={`btn btn-sm ${staff.is_active ? 'btn-outline' : 'btn-primary'}`}
-                        onClick={() => handleToggleStatus(staff.id, staff.is_active)}
-                        style={{ padding: '6px 12px' }}
-                      >
-                        {staff.is_active ? 'Deactivate' : 'Activate'}
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          className={`btn btn-sm ${staff.is_active ? 'btn-outline' : 'btn-primary'}`}
+                          onClick={() => handleToggleStatus(staff.id, staff.is_active)}
+                          style={{ padding: '6px 12px' }}
+                        >
+                          {staff.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => setConfirmDelete(staff)}
+                          style={{ padding: '6px 10px', background: 'rgba(239,68,68,0.1)', color: 'var(--status-critical)', border: '1px solid rgba(239,68,68,0.3)' }}
+                          title="Remove Staff"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

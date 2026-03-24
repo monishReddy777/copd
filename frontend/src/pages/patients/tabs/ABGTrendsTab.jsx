@@ -41,14 +41,18 @@ const ABGTrendsTab = ({ patientId }) => {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Pre-process trends to ensure all values are present for smooth lines
+  // Recharts connects points for the same key. By merging near-simultaneous records
+  // or just having them in sequence, we get a complete view.
   const chartData = trends.map(t => ({
     ...t,
-    time: formatTime(t.timestamp || t.created_at || t.date),
-    ph: parseFloat(t.ph),
-    paco2: parseFloat(t.paco2),
-    pao2: parseFloat(t.pao2),
-    spo2: parseFloat(t.spo2),
-    hco3: parseFloat(t.hco3)
+    time: formatTime(t.timestamp),
+    ph: t.ph ? parseFloat(t.ph) : undefined,
+    paco2: t.paco2 ? parseFloat(t.paco2) : undefined,
+    pao2: t.pao2 ? parseFloat(t.pao2) : undefined,
+    spo2: t.spo2 ? parseFloat(t.spo2) : undefined,
+    hco3: t.hco3 ? parseFloat(t.hco3) : undefined,
+    hr: t.hr ? parseFloat(t.hr) : undefined
   }));
 
   const tooltipStyle = {
@@ -105,7 +109,7 @@ const ABGTrendsTab = ({ patientId }) => {
             <Tooltip contentStyle={tooltipStyle} />
             <ReferenceLine y={7.35} stroke="#EF4444" strokeDasharray="5 5" label={{ value: '7.35', fill: '#EF4444', fontSize: 10 }} />
             <ReferenceLine y={7.45} stroke="#F59E0B" strokeDasharray="5 5" label={{ value: '7.45', fill: '#F59E0B', fontSize: 10 }} />
-            <Line type="monotone" dataKey="ph" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 4, fill: '#8B5CF6' }} activeDot={{ r: 6 }} name="pH" />
+            <Line type="monotone" dataKey="ph" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 4, fill: '#8B5CF6' }} activeDot={{ r: 6 }} name="pH" connectNulls />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -121,24 +125,27 @@ const ABGTrendsTab = ({ patientId }) => {
             <Tooltip contentStyle={tooltipStyle} />
             <Legend />
             <ReferenceLine y={45} stroke="#EF444480" strokeDasharray="5 5" />
-            <Line type="monotone" dataKey="paco2" stroke="#EF4444" strokeWidth={2} dot={{ r: 4, fill: '#EF4444' }} name="PaCO2" />
-            <Line type="monotone" dataKey="pao2" stroke="#3B82F6" strokeWidth={2} dot={{ r: 4, fill: '#3B82F6' }} name="PaO2" />
+            <Line type="monotone" dataKey="paco2" stroke="#EF4444" strokeWidth={2} dot={{ r: 4, fill: '#EF4444' }} name="PaCO2" connectNulls />
+            <Line type="monotone" dataKey="pao2" stroke="#3B82F6" strokeWidth={2} dot={{ r: 4, fill: '#3B82F6' }} name="PaO2" connectNulls />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      {/* SpO2 Chart */}
+      {/* SpO2 & Heart Rate Chart */}
       <div className="card">
-        <h4 style={{ marginBottom: '16px', fontWeight: 600 }}>SpO2 Trend <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Target: 88-92%)</span></h4>
+        <h4 style={{ marginBottom: '16px', fontWeight: 600 }}>SpO2 & Heart Rate <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Target SpO2: 88-92%)</span></h4>
         <ResponsiveContainer width="100%" height={250}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="time" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-            <YAxis domain={[75, 100]} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+            <YAxis yAxisId="left" domain={[75, 100]} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+            <YAxis yAxisId="right" orientation="right" domain={[40, 160]} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
             <Tooltip contentStyle={tooltipStyle} />
-            <ReferenceLine y={88} stroke="#EF4444" strokeDasharray="5 5" />
-            <ReferenceLine y={92} stroke="#F59E0B" strokeDasharray="5 5" />
-            <Line type="monotone" dataKey="spo2" stroke="#10B981" strokeWidth={2} dot={{ r: 4, fill: '#10B981' }} name="SpO2 %" />
+            <Legend />
+            <ReferenceLine yAxisId="left" y={88} stroke="#EF4444" strokeDasharray="5 5" />
+            <ReferenceLine yAxisId="left" y={92} stroke="#F59E0B" strokeDasharray="5 5" />
+            <Line yAxisId="left" type="monotone" dataKey="spo2" stroke="#10B981" strokeWidth={2} dot={{ r: 4, fill: '#10B981' }} name="SpO2 %" connectNulls />
+            <Line yAxisId="right" type="monotone" dataKey="hr" stroke="#F43F5E" strokeWidth={2} dot={{ r: 3, fill: '#F43F5E' }} name="HR (bpm)" connectNulls />
           </LineChart>
         </ResponsiveContainer>
       </div>

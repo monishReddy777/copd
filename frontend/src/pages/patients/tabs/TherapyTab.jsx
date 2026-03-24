@@ -1,8 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { getTherapyRecommendations, startAIAnalysis, acceptTherapy } from '../../../api/therapy';
-import api from '../../../api/axios'; // Import api to get patient details
-import { Activity, BrainCircuit, Wind, RefreshCw, AlertTriangle, AlertCircle, CheckCircle, ChevronRight, ShieldCheck, Clock } from 'lucide-react';
+import api from '../../../api/axios';
+import { getStaffList, postScheduleReassessment } from '../../../api/admin';
+import { Activity, BrainCircuit, Wind, RefreshCw, CheckCircle, ShieldCheck, Clock, Edit3, AlertTriangle, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// 4 standard devices
+const DEVICES = [
+  {
+    id: 'nasal',
+    name: 'Nasal Cannula',
+    flow: '1–4 L/min',
+    fio2: '24–36%',
+    indication: 'Mild hypoxemia, SpO2 > 92%',
+    color: '#10B981',
+  },
+  {
+    id: 'venturi',
+    name: 'Venturi Mask',
+    flow: '4–12 L/min',
+    fio2: '24–60% (controlled)',
+    indication: 'COPD – precise FiO2 needed, SpO2 88–92%',
+    color: '#3B82F6',
+  },
+  {
+    id: 'hfnc',
+    name: 'High-Flow Nasal Cannula (HFNC)',
+    flow: '30–60 L/min',
+    fio2: '21–100%',
+    indication: 'Severe hypoxemia, pH < 7.35 or SpO2 < 88%',
+    color: '#F59E0B',
+  },
+  {
+    id: 'nrb',
+    name: 'Non-Rebreather Mask',
+    flow: '10–15 L/min',
+    fio2: '60–90%',
+    indication: 'Critical hypoxemia, SpO2 < 85%',
+    color: '#EF4444',
+  },
+];
 
 const TherapyTab = ({ patientId }) => {
   const [recommendations, setRecommendations] = useState(null);
@@ -10,72 +47,66 @@ const TherapyTab = ({ patientId }) => {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [accepting, setAccepting] = useState(false);
-  const user = JSON.parse(localStorage.getItem('user'));
+  const [selectedDevice, setSelectedDevice] = useState(null);
+  const [aiDevice, setAiDevice] = useState(null);
+  const [showOverride, setShowOverride] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [staffList, setStaffList] = useState([]);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduleData, setScheduleData] = useState({ staff_id: '', interval_minutes: '30' });
+  const [scheduling, setScheduling] = useState(false);
+
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
   const role = user?.role || localStorage.getItem('role') || 'staff';
 
   useEffect(() => {
-    fetchPatientAndRecommendations();
+    fetchData();
+    if (role === 'doctor') loadStaff();
   }, [patientId]);
 
-  const fetchPatientAndRecommendations = async () => {
+  const loadStaff = async () => {
+    try {
+      const { data } = await getStaffList();
+      setStaffList(data);
+    } catch (e) {
+      // silently fail - not critical
+    }
+  };
+
+  const fetchData = async () => {
     try {
       setLoading(true);
       const [patientRes, recRes] = await Promise.all([
         api.get(`/patients/${patientId}/`),
         getTherapyRecommendations(patientId)
       ]);
-      
       setPatient(patientRes.data);
-      
-      const data = (recRes.data?.recommendations || []).filter(r => r.status === 'pending');
-      if (data && data.length > 0) {
-        const latest = data[0];
-        
-        // Extract device and flow from content string
-        const content = latest.content;
-        let device = 'N/A';
-        let flow = 'As recommended';
-        
-        const deviceMatch = content.match(/AI recommends (.*?) \(Flow: (.*?)\)/);
-        if (deviceMatch) {
-          device = deviceMatch[1];
-          flow = deviceMatch[2];
-        } else if (content.includes('AI recommends ')) {
-          device = content.split('AI recommends ')[1].split(' with')[0];
-        }
 
+      const pending = (recRes.data?.recommendations || []).filter(r => r.status === 'pending');
+      if (pending.length > 0) {
+        const latest = pending[0];
+        const content = latest.content;
+        let device = null;
+
+        // Detect AI device from content
+        if (content.includes('Non-Rebreather')) device = 'nrb';
+        else if (content.includes('HFNC') || content.includes('High-Flow')) device = 'hfnc';
+        else if (content.includes('Venturi')) device = 'venturi';
+        else device = 'nasal';
+
+        setAiDevice(device);
+        setSelectedDevice(device);
         setRecommendations({
           id: latest.id,
-          created_at: latest.created_at,
-          status: latest.status,
           content: latest.content,
-          niv_advice: {
-            recommended: latest.content.toLowerCase().includes('niv'),
-            reason: latest.content
-          },
-          device_recommendation: {
-            primary_device: device,
-            flow_rate: flow,
-            rationale: latest.content
-          },
-          oxygen_status: {
-            is_hypoxemic: latest.content.toLowerCase().includes('risk'),
-            severity: latest.content.includes('HIGH') ? 'High' : 'Moderate',
-            target_spo2_min: 88,
-            target_spo2_max: 92
-          },
-          escalation_triggers: [
-            "pH < 7.35 with PaCO2 > 45 mmHg",
-            "Respiratory rate > 30 bpm",
-            "Signs of respiratory distress",
-            "SpO2 remains < 88% despite current therapy"
-          ]
+          status: latest.status,
+          created_at: latest.created_at,
         });
       } else {
         setRecommendations(null);
+        setAiDevice(null);
       }
     } catch (error) {
-      console.error('Failed to load data', error);
       toast.error('Failed to load therapy data');
     } finally {
       setLoading(false);
@@ -87,81 +118,128 @@ const TherapyTab = ({ patientId }) => {
     try {
       await toast.promise(
         startAIAnalysis(patientId),
-        {
-          loading: 'AI is analyzing clinical data...',
-          success: 'Analysis complete.',
-          error: 'Analysis failed. Need Vitals/ABG data.',
-        }
+        { loading: 'AI analyzing clinical data...', success: 'Analysis complete.', error: 'Need Vitals/ABG data first.' }
       );
-      fetchPatientAndRecommendations();
+      fetchData();
+    } catch (e) {}
+    finally { setAnalyzing(false); }
+  };
+
+  const handleConfirmTherapy = async () => {
+    if (role !== 'doctor') { toast.error('Only doctors can approve therapy'); return; }
+    setAccepting(true);
+    const device = DEVICES.find(d => d.id === selectedDevice);
+    const isOverride = selectedDevice !== aiDevice;
+
+    try {
+      if (isOverride && !overrideReason.trim()) {
+        toast.error('Please provide an override reason');
+        setAccepting(false);
+        return;
+      }
+      await acceptTherapy(patientId, recommendations?.id, {
+        selected_device: device?.name,
+        flow_rate: device?.flow,
+        is_override: isOverride,
+        override_reason: overrideReason,
+      });
+      toast.success(`Therapy approved: ${device?.name}`);
+      setShowOverride(false);
+      fetchData();
     } catch (error) {
-      console.error('Analysis error', error);
+      toast.error(error.response?.data?.error || 'Failed to approve therapy');
     } finally {
-      setAnalyzing(false);
+      setAccepting(false);
     }
   };
 
-  const handleAcceptTherapy = async () => {
-    if (role !== 'doctor') {
-      toast.error('Only doctors can approve therapy');
-      return;
-    }
-
-    setAccepting(true);
+  const handleScheduleReassessment = async (e) => {
+    e.preventDefault();
+    setScheduling(true);
     try {
-      await toast.promise(
-        acceptTherapy(patientId, recommendations.id),
-        {
-          loading: 'Approving therapy...',
-          success: 'Therapy approved and started!',
-          error: (err) => err.response?.data?.error || 'Failed to approve therapy',
-        }
-      );
-      fetchPatientAndRecommendations();
+      await postScheduleReassessment(patientId, {
+        assigned_staff: scheduleData.staff_id,
+        interval_minutes: parseInt(scheduleData.interval_minutes),
+      });
+      toast.success(`Reassessment scheduled in ${scheduleData.interval_minutes} minutes. Staff notified.`);
+      setShowSchedule(false);
     } catch (error) {
-      console.error('Approval error', error);
+      toast.error('Failed to schedule reassessment');
     } finally {
-      setAccepting(false);
+      setScheduling(false);
     }
   };
 
   if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}><RefreshCw className="spin" /></div>;
 
   return (
-    <div className="card">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
-        <div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BrainCircuit size={20} color="var(--accent-purple)" /> Respiratory Therapy Support
-          </h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '4px' }}>
-            AI-driven device recommendation based on real-time vitals
-          </p>
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <BrainCircuit size={20} color="var(--accent-purple)" /> Respiratory Therapy Support
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '4px' }}>
+              AI-driven device recommendation based on real-time vitals & ABG
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-primary"
+              onClick={handleRunAnalysis}
+              disabled={analyzing}
+              style={{ background: 'var(--accent-purple)', borderColor: 'var(--accent-purple)' }}>
+              {analyzing ? <RefreshCw size={16} className="spin" /> : <Activity size={16} />}
+              <span style={{ marginLeft: '8px' }}>Run AI Analysis</span>
+            </button>
+            {role === 'doctor' && (
+              <button className="btn btn-outline" onClick={() => setShowSchedule(s => !s)}>
+                <Calendar size={16} /> Schedule Reassessment
+              </button>
+            )}
+          </div>
         </div>
-        <button 
-          className="btn btn-primary" 
-          onClick={handleRunAnalysis} 
-          disabled={analyzing}
-          style={{ background: 'var(--accent-purple)', borderColor: 'var(--accent-purple)' }}
-        >
-          {analyzing ? <RefreshCw size={16} className="spin" /> : <Activity size={16} />}
-          <span style={{ marginLeft: '8px' }}>Run AI Analysis</span>
-        </button>
+
+        {/* Reassessment Scheduler */}
+        {showSchedule && role === 'doctor' && (
+          <div style={{ marginTop: '20px', padding: '20px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+            <h4 style={{ marginBottom: '16px', fontWeight: 600 }}>Schedule Staff Reassessment</h4>
+            <form onSubmit={handleScheduleReassessment}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Reassessment Interval</label>
+                  <select className="form-select" value={scheduleData.interval_minutes}
+                    onChange={e => setScheduleData({ ...scheduleData, interval_minutes: e.target.value })} required>
+                    <option value="30">30 minutes</option>
+                    <option value="60">1 hour</option>
+                    <option value="120">2 hours</option>
+                    <option value="240">4 hours</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Assign Staff</label>
+                  <select className="form-select" value={scheduleData.staff_id}
+                    onChange={e => setScheduleData({ ...scheduleData, staff_id: e.target.value })} required>
+                    <option value="">Select staff member...</option>
+                    {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setShowSchedule(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={scheduling}>
+                  {scheduling ? 'Scheduling...' : 'Schedule & Notify Staff'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
 
-      {/* Active Therapy Banner */}
+      {/* Active approved therapy banner */}
       {patient?.current_device && (
-        <div style={{ 
-          background: 'rgba(16, 185, 129, 0.1)', 
-          border: '1px solid var(--status-stable)', 
-          padding: '20px', 
-          borderRadius: 'var(--radius-lg)',
-          marginBottom: '32px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
+        <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid var(--status-stable)', padding: '20px', borderRadius: 'var(--radius-lg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ background: 'var(--status-stable)', padding: '12px', borderRadius: '50%', color: 'white' }}>
               <ShieldCheck size={24} />
@@ -169,123 +247,124 @@ const TherapyTab = ({ patientId }) => {
             <div>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--status-stable)', fontWeight: 700 }}>Active Approved Therapy</div>
               <h4 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '4px 0' }}>{patient.current_device}</h4>
-              <div style={{ display: 'flex', gap: '12px', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                <span>Flow: <strong>{patient.current_flow_rate}</strong></span>
-                <span>•</span>
-                <span>Started: {new Date(patient.therapy_approved_at).toLocaleString()}</span>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                Flow: <strong>{patient.current_flow_rate}</strong>
+                {patient.therapy_approved_at && <> • Started: {new Date(patient.therapy_approved_at).toLocaleString()}</>}
               </div>
             </div>
-          </div>
-          <div style={{ textAlign: 'right', display: 'none' }}>
-            {/* Could add a 'Stop Therapy' button here if needed */}
           </div>
         </div>
       )}
 
-      {!recommendations ? (
-        <div className="empty-state">
-          <BrainCircuit className="empty-state-icon" style={{ color: 'var(--accent-purple)' }} />
-          <h3>No Recommendations Yet</h3>
-          <p>Run analysis to get AI-powered therapy guidance for this patient.</p>
+      {/* 4-Device selection grid */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h4 style={{ fontSize: '1.125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Wind size={18} color="var(--accent-primary)" /> Oxygen Delivery Device Selection
+          </h4>
+          {aiDevice && (
+            <span style={{ fontSize: '0.8125rem', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <BrainCircuit size={14} /> AI Recommends: <strong style={{ marginLeft: '4px' }}>{DEVICES.find(d => d.id === aiDevice)?.name}</strong>
+            </span>
+          )}
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* Recommendation Info */}
-          <div style={{ 
-            background: recommendations.status === 'accepted' ? 'var(--bg-secondary)' : 'var(--gradient-subtle)', 
-            padding: '24px', 
-            borderRadius: 'var(--radius-lg)', 
-            border: '1px solid var(--border)',
-            position: 'relative',
-            opacity: recommendations.status === 'accepted' ? 0.8 : 1
-          }}>
-            {recommendations.status === 'accepted' && (
-              <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--status-stable)', color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CheckCircle size={12} /> Approved
-              </div>
-            )}
 
-            <h4 style={{ fontSize: '1.125rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-              <Wind size={20} color="var(--accent-primary)" /> AI Recommendation
-            </h4>
-            
-            <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-              <div style={{ background: 'var(--bg-surface)', padding: '16px', borderRadius: 'var(--radius-sm)', flex: 2, border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Recommended Device</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-primary)' }}>{recommendations.device_recommendation.primary_device}</div>
-              </div>
-              <div style={{ background: 'var(--bg-surface)', padding: '16px', borderRadius: 'var(--radius-sm)', flex: 1, border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Flow Rate</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{recommendations.device_recommendation.flow_rate}</div>
-              </div>
-            </div>
-
-            <div>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', display: 'block', marginBottom: '4px' }}>Clinical Rationale</span>
-              <p style={{ background: 'var(--bg-surface)', padding: '12px', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-                {recommendations.content}
-              </p>
-            </div>
-            
-            {recommendations.status !== 'accepted' && role === 'doctor' && (
-              <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-                <button 
-                  className="btn btn-primary" 
-                  onClick={handleAcceptTherapy}
-                  disabled={accepting}
-                  style={{ gap: '8px' }}
-                >
-                  {accepting ? <RefreshCw size={16} className="spin" /> : <CheckCircle size={16} />}
-                  Accept & Start Therapy
-                </button>
-              </div>
-            )}
-            
-            {recommendations.status !== 'accepted' && role !== 'doctor' && (
-              <div style={{ marginTop: '16px', padding: '10px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', color: 'var(--status-warning)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={14} /> Waiting for doctor's clinical approval
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: '24px' }}>
-             {/* Escalation Triggers */}
-            <div style={{ flex: 1 }}>
-              <h4 style={{ fontSize: '1rem', marginBottom: '16px', color: 'var(--text-primary)' }}>Monitor for Escalation</h4>
-              <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {recommendations.escalation_triggers.map((trigger, i) => (
-                  <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', background: 'rgba(239, 68, 68, 0.05)', padding: '12px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
-                    <AlertCircle size={14} color="var(--status-critical)" style={{ marginTop: '3px' }} />
-                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{trigger}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            
-            <div style={{ flex: 1, background: 'var(--bg-secondary)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-              <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '0.9375rem' }}>
-                <Activity size={16} color="var(--status-warning)" /> Treatment Targets
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Oxygen Target</span>
-                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>88% - 92% SpO2</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Hypercapnia</span>
-                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Avoid PaCO2 {'>'} 45</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>pH Balance</span>
-                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Maintain 7.35 - 7.45</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '16px' }}>
+          {DEVICES.map(device => {
+            const isAI = device.id === aiDevice;
+            const isSelected = device.id === selectedDevice;
+            return (
+              <div
+                key={device.id}
+                onClick={() => role === 'doctor' && setSelectedDevice(device.id)}
+                style={{
+                  padding: '20px',
+                  borderRadius: 'var(--radius-lg)',
+                  border: isSelected ? `2px solid ${device.color}` : '2px solid var(--border)',
+                  background: isSelected ? `${device.color}15` : 'var(--bg-secondary)',
+                  cursor: role === 'doctor' ? 'pointer' : 'default',
+                  position: 'relative',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {isAI && (
+                  <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'var(--accent-purple)', color: 'white', padding: '3px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700 }}>
+                    AI PICK
+                  </div>
+                )}
+                {isSelected && (
+                  <CheckCircle size={18} color={device.color} style={{ position: 'absolute', top: '10px', left: '10px' }} />
+                )}
+                <div style={{ paddingLeft: isSelected ? '24px' : 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: device.color, marginBottom: '6px' }}>{device.name}</div>
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Flow: <strong>{device.flow}</strong> · FiO2: <strong>{device.fio2}</strong>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>{device.indication}</div>
                 </div>
               </div>
-            </div>
-          </div>
-
+            );
+          })}
         </div>
-      )}
+
+        {role === 'doctor' && recommendations && selectedDevice !== aiDevice && (
+          <div style={{ marginTop: '16px', padding: '14px', background: 'rgba(245,158,11,0.1)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(245,158,11,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', fontWeight: 600, color: 'var(--status-warning)' }}>
+              <AlertTriangle size={16} /> Override — Reason Required
+            </div>
+            <textarea
+              className="form-input"
+              rows={2}
+              placeholder="Explain why you are overriding the AI recommendation..."
+              value={overrideReason}
+              onChange={e => setOverrideReason(e.target.value)}
+              style={{ width: '100%', resize: 'vertical' }}
+            />
+          </div>
+        )}
+
+        {role === 'doctor' && recommendations && (
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <button className="btn btn-primary" onClick={handleConfirmTherapy} disabled={accepting}
+              style={{ gap: '8px' }}>
+              {accepting ? <RefreshCw size={16} className="spin" /> : <CheckCircle size={16} />}
+              {selectedDevice !== aiDevice ? 'Override & Apply Therapy' : 'Accept & Start Therapy'}
+            </button>
+          </div>
+        )}
+
+        {role !== 'doctor' && (
+          <div style={{ marginTop: '16px', padding: '10px', background: 'rgba(245,158,11,0.1)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', color: 'var(--status-warning)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Clock size={14} /> Waiting for doctor's clinical approval
+          </div>
+        )}
+
+        {!recommendations && (
+          <div className="empty-state" style={{ marginTop: '20px' }}>
+            <BrainCircuit className="empty-state-icon" style={{ color: 'var(--accent-purple)' }} />
+            <h3>Run AI Analysis First</h3>
+            <p>AI will recommend a device based on current vitals and ABG values.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Escalation triggers */}
+      <div className="card">
+        <h4 style={{ fontSize: '1rem', marginBottom: '16px', fontWeight: 600 }}>Monitor for Escalation</h4>
+        <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {[
+            'pH < 7.35 with PaCO2 > 45 mmHg',
+            'Respiratory rate > 30 bpm',
+            'Signs of respiratory distress or use of accessory muscles',
+            'SpO2 remains < 88% despite current therapy',
+          ].map((trigger, i) => (
+            <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', background: 'rgba(239,68,68,0.05)', padding: '12px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(239,68,68,0.1)' }}>
+              <AlertTriangle size={14} color="var(--status-critical)" style={{ marginTop: '3px' }} />
+              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{trigger}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 };
