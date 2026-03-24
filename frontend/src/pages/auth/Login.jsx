@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { doctorLogin, staffLogin, adminLogin } from '../../api/auth';
+import { doctorLogin, staffLogin, adminLogin, verifyEmailOTP } from '../../api/auth';
 import { Activity, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -12,8 +12,9 @@ const Login = () => {
   
   // Default to doctor if no role provided or invalid role
   const [role, setRole] = useState(urlRole || 'doctor');
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [formData, setFormData] = useState({ email: '', password: '', otp: '' });
   const [loading, setLoading] = useState(false);
+  const [showOtpInput, setShowOtpInput] = useState(false);
 
   // If already logged in, redirect to appropriate dashboard
   useEffect(() => {
@@ -51,12 +52,14 @@ const Login = () => {
         response = await adminLogin(formData);
       }
 
+      if (response.data?.otp_required) {
+        setShowOtpInput(true);
+        toast.success(response.data.message || 'OTP sent to your email');
+        return;
+      }
+
       if (response.data?.access || response.data?.token) {
-        const token = response.data.access || response.data.token;
-        const userData = response.data.user || response.data.doctor || response.data.staff || response.data.admin || { name: 'User', email: formData.email };
-        login(token, userData, role);
-        toast.success(`Welcome back, ${userData.name || 'User'}!`);
-        navigate(`/${role}/dashboard`);
+        completeLogin(response.data);
       } else {
         toast.error('Invalid response from server');
       }
@@ -66,6 +69,40 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.otp) {
+      toast.error('Please enter the OTP');
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await verifyEmailOTP({ 
+        email: formData.email, 
+        otp: formData.otp, 
+        purpose: 'login' 
+      });
+      
+      if (response.data?.access) {
+        completeLogin(response.data);
+      } else {
+        toast.error('Invalid OTP or verification failed');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completeLogin = (data) => {
+    const token = data.access || data.token;
+    const userData = data.user || data.doctor || data.staff || data.admin || { name: 'User', email: formData.email };
+    login(token, userData, role);
+    toast.success(`Welcome back, ${userData.name || 'User'}!`);
+    navigate(`/${role}/dashboard`);
   };
 
   const handleRoleChange = (newRole) => {
@@ -119,39 +156,61 @@ const Login = () => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Email Address</label>
-            <input 
-              type="email" 
-              name="email"
-              className="form-input" 
-              placeholder={`Enter your ${role} email`}
-              value={formData.email}
-              onChange={handleChange}
-              required
-            />
-          </div>
+        <form onSubmit={showOtpInput ? handleOtpSubmit : handleSubmit}>
+          {!showOtpInput ? (
+            <>
+              <div className="form-group">
+                <label className="form-label">Email Address</label>
+                <input 
+                  type="email" 
+                  name="email"
+                  className="form-input" 
+                  placeholder={`Enter your ${role} email`}
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
 
-          <div className="form-group">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label className="form-label" style={{ marginBottom: 0 }}>Password</label>
-              {role !== 'admin' && (
-                <Link to="/forgot-password" style={{ fontSize: '0.8125rem', fontWeight: 500 }}>
-                  Forgot password?
-                </Link>
-              )}
+              <div className="form-group">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label className="form-label" style={{ marginBottom: 0 }}>Password</label>
+                  {role !== 'admin' && (
+                    <Link to="/forgot-password" style={{ fontSize: '0.8125rem', fontWeight: 500 }}>
+                      Forgot password?
+                    </Link>
+                  )}
+                </div>
+                <input 
+                  type="password" 
+                  name="password"
+                  className="form-input" 
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </>
+          ) : (
+            <div className="form-group animate-in">
+              <label className="form-label">Enter OTP Sent to {formData.email}</label>
+              <input 
+                type="text" 
+                name="otp"
+                className="form-input" 
+                placeholder="6-digit code"
+                value={formData.otp}
+                onChange={handleChange}
+                maxLength={6}
+                required
+                autoFocus
+              />
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                Didn't receive code? <button type="button" onClick={() => setShowOtpInput(false)} className="btn-link">Go back</button>
+              </p>
             </div>
-            <input 
-              type="password" 
-              name="password"
-              className="form-input" 
-              placeholder="Enter your password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-            />
-          </div>
+          )}
 
           <button 
             type="submit" 
@@ -161,9 +220,10 @@ const Login = () => {
           >
             {loading ? (
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }}></span> Signing in...
+                <span className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }}></span> 
+                {showOtpInput ? 'Verifying...' : 'Signing in...'}
               </span>
-            ) : 'Sign In'}
+            ) : (showOtpInput ? 'Verify & Login' : 'Sign In')}
           </button>
         </form>
 

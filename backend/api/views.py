@@ -9,6 +9,10 @@ from .serializers import *
 from django.contrib.auth.models import User
 from django.contrib.auth import get_user_model
 from .ai_utils import get_ai_prediction, analyze_trends
+from .email_utils import send_otp_email
+import random
+from datetime import timedelta
+from django.utils import timezone
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -105,13 +109,111 @@ class LoginAPIView(APIView):
                 pass
             
         tokens = get_tokens_for_user(user)
-        print(f"SUCCESS Login: User {username} authenticated")
-        return Response({
-            "access": tokens['access'],
-            "refresh": tokens['refresh'],
-            "role": user.role,
-            "user_id": user.id
-        })
+        
+        # Admin login remains same (no OTP)
+        if user.role == 'admin':
+            print(f"SUCCESS Login: Admin {username} authenticated")
+            return Response({
+                "access": tokens['access'],
+                "refresh": tokens['refresh'],
+                "role": user.role,
+                "user_id": user.id
+            })
+            
+        # Doctor and Staff require OTP
+        otp = str(random.randint(100000, 999999))
+        expires_at = timezone.now() + timedelta(minutes=10)
+        
+        # Save OTP for login
+        EmailOTP.objects.filter(email=user.email, purpose='login').delete() # Clear old ones
+        EmailOTP.objects.create(
+            email=user.email,
+            otp=otp,
+            purpose='login',
+            expires_at=expires_at
+        )
+        
+        if send_otp_email(user.email, otp, 'login'):
+            print(f"SUCCESS Login Step 1: OTP sent to {user.email}")
+            return Response({
+                "otp_required": True,
+                "email": user.email,
+                "message": "OTP sent to your email. Please verify to complete login."
+            })
+        else:
+            return Response({"error": "Failed to send OTP. Please try again."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class RequestOTPAPIView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        email = request.data.get('email')
+        purpose = request.data.get('purpose', 'signup') # 'signup' or 'login'
+        
+        if not email:
+            return Response({"error": "Email is required"}, status=400)
+            
+        # For signup, check if user already exists
+        if purpose == 'signup':
+            if CustomUser.objects.filter(email=email).exists():
+                return Response({"error": "Email already registered"}, status=400)
+        
+        otp = str(random.randint(100000, 999999))
+        expires_at = timezone.now() + timedelta(minutes=10)
+        
+        EmailOTP.objects.filter(email=email, purpose=purpose).delete()
+        EmailOTP.objects.create(
+            email=email,
+            otp=otp,
+            purpose=purpose,
+            expires_at=expires_at
+        )
+        
+        if send_otp_email(email, otp, purpose):
+            return Response({"message": f"OTP sent to {email}"})
+        else:
+            return Response({"error": "Failed to send OTP"}, status=500)
+
+class VerifyOTPAPIView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        email = request.data.get('email')
+        otp = request.data.get('otp')
+        purpose = request.data.get('purpose', 'signup')
+        
+        if not email or not otp:
+            return Response({"error": "Email and OTP are required"}, status=400)
+            
+        otp_record = EmailOTP.objects.filter(
+            email=email, 
+            otp=otp, 
+            purpose=purpose,
+            expires_at__gt=timezone.now()
+        ).first()
+        
+        if not otp_record:
+            return Response({"error": "Invalid or expired OTP"}, status=400)
+            
+        otp_record.is_verified = True
+        otp_record.save()
+        
+        if purpose == 'login':
+            # Return tokens for login
+            try:
+                user = CustomUser.objects.get(email=email)
+                tokens = get_tokens_for_user(user)
+                return Response({
+                    "access": tokens['access'],
+                    "refresh": tokens['refresh'],
+                    "role": user.role,
+                    "user_id": user.id,
+                    "message": "Login successful"
+                })
+            except CustomUser.DoesNotExist:
+                return Response({"error": "User not found"}, status=404)
+                
+        return Response({"message": "Email verified successfully"})
 
 class ProfileAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -219,23 +321,28 @@ class AdminApproveUserAPIView(APIView):
                     doc = u.doctor_profile
                     if doc:
                         doc.status = 'active'
-                        doc.is_active = True # Set doctor profile to active
+                        doc.is_active = True
                         doc.save()
-                except getattr(CustomUser, 'doctor_profile').RelatedObjectDoesNotExist:
-                    pass
-                except Exception:
-                    pass
-                    
+                    else:
+                        raise AttributeError # Trigger creation
+                except (getattr(CustomUser, 'doctor_profile').RelatedObjectDoesNotExist, AttributeError):
+                    Doctor.objects.create(
+                        user=u, name=u.first_name + " " + u.last_name, email=u.email,
+                        status='active', is_active=True, license_number=f'APPROVED-{u.id}'
+                    )
             elif u.role == 'staff':
                 try:
                     staff = u.staff_profile
                     if staff:
                         staff.status = 'active'
                         staff.save()
-                except getattr(CustomUser, 'staff_profile').RelatedObjectDoesNotExist:
-                    pass
-                except Exception:
-                    pass
+                    else:
+                        raise AttributeError
+                except (getattr(CustomUser, 'staff_profile').RelatedObjectDoesNotExist, AttributeError):
+                    Staff.objects.create(
+                        user=u, name=u.first_name + " " + u.last_name, email=u.email,
+                        status='active', license_id=f'APPROVED-{u.id}'
+                    )
             
             return Response({"message": "Approved"})
         except CustomUser.DoesNotExist:
@@ -956,19 +1063,13 @@ import secrets
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.hashers import make_password
-
-
-# ── Change this to your actual server/tunnel URL ──────────────────────────────
-SERVER_BASE_URL = "https://3dxz8qrz-8000.inc1.devtunnels.ms"
+from .serializers import SignupSerializer # Import SignupSerializer here for use in ResetPasswordAPIView
 
 
 class ForgotPasswordAPIView(APIView):
     """
     POST /api/forgot-password/
     Body: { "email": "..." }
-
-    Checks sandhiya.doctor and sandhiya.staff for the email.
-    Generates a secure reset token, stores it, and emails the reset link.
     """
     permission_classes = [AllowAny]
 
@@ -977,126 +1078,72 @@ class ForgotPasswordAPIView(APIView):
         if not email:
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check sandhiya.doctor table
-        role = None
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT id FROM doctor WHERE email = %s LIMIT 1", [email])
-            if cursor.fetchone():
-                role = "doctor"
+        user = CustomUser.objects.filter(email=email).first()
+        if not user or user.role == 'admin':
+            # Same message for security
+            return Response({"message": "If that email exists, an OTP has been sent."})
 
-        # Check sandhiya.staff table if not found in doctor
-        if role is None:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT id FROM staff WHERE email = %s LIMIT 1", [email])
-                if cursor.fetchone():
-                    role = "staff"
+        otp = str(random.randint(100000, 999999))
+        expires_at = timezone.now() + timedelta(minutes=10)
 
-        if role is None:
-            # Return same message to prevent email enumeration
-            return Response(
-                {"message": "If that email exists, a reset link has been sent."},
-                status=status.HTTP_200_OK
-            )
-
-        # Invalidate old unused tokens for this email
-        from .models import PasswordResetToken
-        PasswordResetToken.objects.filter(email=email, is_used=False).update(is_used=True)
-
-        # Generate secure token (48 chars URL-safe)
-        token = secrets.token_urlsafe(48)
-        expires_at = timezone.now() + timedelta(minutes=30)
-
-        PasswordResetToken.objects.create(
+        EmailOTP.objects.filter(email=email, purpose='forgot_password').delete()
+        EmailOTP.objects.create(
             email=email,
-            role=role,
-            token=token,
-            is_used=False,
+            otp=otp,
+            purpose='forgot_password',
             expires_at=expires_at
         )
 
-        reset_link = f"{SERVER_BASE_URL}/api/reset-password/{token}/"
-
-        try:
-            send_mail(
-                subject="Password Reset Request",
-                message=(
-                    f"Hello,\n\n"
-                    f"You requested a password reset for your CDSS COPD account.\n\n"
-                    f"Click the link below to reset your password:\n"
-                    f"{reset_link}\n\n"
-                    f"This link is valid for 30 minutes.\n\n"
-                    f"If you did not request this, please ignore this email.\n\n"
-                    f"CDSS COPD Team"
-                ),
-                from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[email],
-                fail_silently=False,
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Token generated but email could not be sent: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-        return Response(
-            {"message": "If that email exists, a reset link has been sent."},
-            status=status.HTTP_200_OK
-        )
-
+        if send_otp_email(email, otp, 'password reset'):
+            return Response({"message": "If that email exists, an OTP has been sent."})
+        else:
+            return Response({"error": "Failed to send OTP"}, status=500)
 
 class ResetPasswordAPIView(APIView):
     """
-    POST /api/reset-password/<token>/
-    Body: { "new_password": "..." }
-
-    Validates the token, identifies doctor or staff,
-    and updates the password in sandhiya.doctor or sandhiya.staff.
+    POST /api/reset-password/
+    Body: { "email": "...", "otp": "...", "new_password": "..." }
     """
     permission_classes = [AllowAny]
 
-    def post(self, request, token):
-        new_password = request.data.get("new_password", "").strip()
-        if not new_password:
-            return Response({"error": "new_password is required"}, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request):
+        email = request.data.get("email")
+        otp = request.data.get("otp")
+        new_password = request.data.get("new_password")
 
-        if len(new_password) < 6:
-            return Response({"error": "Password must be at least 6 characters"}, status=status.HTTP_400_BAD_REQUEST)
+        if not all([email, otp, new_password]):
+            return Response({"error": "Email, OTP and new password are required"}, status=400)
 
-        from .models import PasswordResetToken
+        otp_record = EmailOTP.objects.filter(
+            email=email, 
+            otp=otp, 
+            purpose='forgot_password',
+            expires_at__gt=timezone.now()
+        ).first()
 
+        if not otp_record:
+            return Response({"error": "Invalid or expired OTP"}, status=400)
+
+        user = CustomUser.objects.filter(email=email).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        # Validate password complexity
         try:
-            reset_token = PasswordResetToken.objects.get(token=token, is_used=False)
-        except PasswordResetToken.DoesNotExist:
-            return Response({"error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
+            # We can use the serializer's validation logic
+            SignupSerializer().validate_password(new_password)
+        except serializers.ValidationError as e:
+            return Response({"error": e.detail[0]}, status=400)
 
-        # Check expiry
-        if timezone.now() > reset_token.expires_at:
-            reset_token.is_used = True
-            reset_token.save()
-            return Response({"error": "Token has expired. Please request a new reset link."}, status=status.HTTP_400_BAD_REQUEST)
+        user.set_password(new_password)
+        user.save()
+        
+        otp_record.is_verified = True
+        otp_record.save()
 
-        # Hash the new password securely
-        hashed_password = make_password(new_password)
+        return Response({"message": "Password reset successfully"})
 
-        # Update the correct table based on role
-        if reset_token.role == "doctor":
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "UPDATE doctor SET password = %s WHERE email = %s",
-                    [hashed_password, reset_token.email]
-                )
-        elif reset_token.role == "staff":
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "UPDATE staff SET password = %s WHERE email = %s",
-                    [hashed_password, reset_token.email]
-                )
-
-        # Mark token as used
-        reset_token.is_used = True
-        reset_token.save()
-
-        return Response({"message": "Password reset successfully"}, status=status.HTTP_200_OK)
+# --- UPDATE PROFILE & OTHER ---
 
 
 class UpdateProfileAPIView(APIView):

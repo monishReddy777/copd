@@ -27,10 +27,10 @@ echo.
 echo   Before running this script, open MySQL and run:
 echo     CREATE DATABASE cdss_copd;
 echo.
-echo   Then update backend/backend/settings.py with YOUR MySQL credentials:
-echo     - NAME: your database name
-echo     - USER: your MySQL username
-echo     - PASSWORD: your MySQL password
+echo   Then update backend/backend/settings.py with YOUR credentials:
+echo     - MySQL NAME, USER, PASSWORD
+echo     - EMAIL_HOST_USER: Your Gmail
+echo     - EMAIL_HOST_PASSWORD: Your Gmail App Password (REQUIRED for OTP)
 echo.
 set /p CONTINUE="Have you done the above? (y/n): "
 if /i not "%CONTINUE%"=="y" (

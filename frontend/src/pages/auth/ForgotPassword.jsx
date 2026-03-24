@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { doctorForgotPassword, staffForgotPassword } from '../../api/auth';
+import { forgotPassword } from '../../api/auth';
 import { Mail, ArrowLeft, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -18,11 +18,7 @@ const ForgotPassword = () => {
     setLoading(true);
 
     try {
-      if (role === 'doctor') {
-        await doctorForgotPassword({ email });
-      } else {
-        await staffForgotPassword({ email });
-      }
+      await forgotPassword({ email });
       
       toast.success('OTP sent to your email');
       navigate('/verify-otp', { state: { email, role } });

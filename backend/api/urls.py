@@ -16,6 +16,8 @@ urlpatterns = [
     path('auth/signup/', SignupAPIView.as_view(), name='signup'),
     path('register/', SignupAPIView.as_view(), name='register'),  # Alias for signup
     path('auth/login/', LoginAPIView.as_view(), name='login'),
+    path('auth/request-otp/', RequestOTPAPIView.as_view(), name='request_otp'),
+    path('auth/verify-otp/', VerifyOTPAPIView.as_view(), name='verify_otp'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/profile/', ProfileAPIView.as_view(), name='profile'),
     
@@ -69,7 +71,7 @@ urlpatterns = [
 
     # Forgot / Reset Password (Doctor + Staff)
     path('forgot-password/', ForgotPasswordAPIView.as_view(), name='forgot_password'),
-    path('reset-password/<str:token>/', ResetPasswordAPIView.as_view(), name='reset_password'),
+    path('reset-password/', ResetPasswordAPIView.as_view(), name='reset_password'),
 
     # Universal Profile Update
     path('update-profile/', UpdateProfileAPIView.as_view(), name='update_profile'),

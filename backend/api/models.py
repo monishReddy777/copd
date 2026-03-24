@@ -191,3 +191,22 @@ class PasswordResetToken(models.Model):
 
     def __str__(self):
         return f"{self.role} | {self.email} | used={self.is_used}"
+
+class EmailOTP(models.Model):
+    PURPOSE_CHOICES = [
+        ('signup', 'Signup Verification'),
+        ('login', 'Login Verification'),
+        ('forgot_password', 'Forgot Password'),
+    ]
+    email = models.EmailField()
+    otp = models.CharField(max_length=6)
+    purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES, default='signup')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_verified = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'email_otp'
+
+    def __str__(self):
+        return f"{self.email} | {self.otp} | verified={self.is_verified}"

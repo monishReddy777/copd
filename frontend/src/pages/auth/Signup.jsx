@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { doctorSignup, staffSignup } from '../../api/auth';
-import { Activity, ArrowLeft } from 'lucide-react';
+import { doctorSignup, staffSignup, requestOTP, verifyEmailOTP } from '../../api/auth';
+import { Activity, ArrowLeft, CheckCircle, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Signup = () => {
@@ -18,19 +18,88 @@ const Signup = () => {
     license_number: '', // Doctor
     department: '', // Staff
     staff_id: '', // Staff
-    terms_accepted: false
+    terms_accepted: false,
+    otp: ''
   });
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   const handleChange = (e) => {
-    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setFormData({ ...formData, [e.target.name]: value });
+    const { name, value, type, checked } = e.target;
+    const val = type === 'checkbox' ? checked : value;
+    setFormData({ ...formData, [name]: val });
+
+    if (name === 'password') {
+      validatePassword(value);
+    }
+  };
+
+  const validatePassword = (pass) => {
+    if (pass.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+    } else if (!/[A-Z]/.test(pass)) {
+      setPasswordError('Must contain at least one uppercase letter');
+    } else if (!/[a-z]/.test(pass)) {
+      setPasswordError('Must contain at least one lowercase letter');
+    } else if (!/[0-9]/.test(pass)) {
+      setPasswordError('Must contain at least one digit');
+    } else if (!/[!@#$%^&*(),.?":{}|<>+=-]/.test(pass)) {
+      setPasswordError('Must contain at least one special character');
+    } else {
+      setPasswordError('');
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!formData.email) {
+      toast.error('Please enter your email first');
+      return;
+    }
+    setLoading(true);
+    try {
+      await requestOTP({ email: formData.email, purpose: 'signup' });
+      setIsOtpSent(true);
+      toast.success('OTP sent to your email');
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!formData.otp) {
+      toast.error('Please enter the OTP');
+      return;
+    }
+    setLoading(true);
+    try {
+      await verifyEmailOTP({ email: formData.email, otp: formData.otp, purpose: 'signup' });
+      setIsEmailVerified(true);
+      toast.success('Email verified successfully');
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Invalid OTP');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (passwordError) {
+      toast.error(passwordError);
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
+      return;
+    }
+
+    if (!isEmailVerified) {
+      toast.error('Please verify your email with OTP first');
       return;
     }
 
@@ -107,12 +176,53 @@ const Signup = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Email Address</label>
-              <input 
-                type="email" name="email" className="form-input" 
-                placeholder="john@hospital.com" value={formData.email} onChange={handleChange} required 
-              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  type="email" name="email" className="form-input" 
+                  placeholder="john@hospital.com" value={formData.email} onChange={handleChange} 
+                  required disabled={isEmailVerified}
+                />
+                {!isEmailVerified && (
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={handleSendOtp}
+                    disabled={loading || isOtpSent}
+                    style={{ whiteSpace: 'nowrap', padding: '0 12px' }}
+                  >
+                    {isOtpSent ? 'Resend' : 'Send OTP'}
+                  </button>
+                )}
+                {isEmailVerified && (
+                  <div style={{ display: 'flex', alignItems: 'center', color: 'var(--success)', gap: '4px' }}>
+                    <CheckCircle size={20} />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+
+          {isOtpSent && !isEmailVerified && (
+            <div className="form-group animate-in">
+              <label className="form-label">Enter OTP Sent to Email</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  type="text" name="otp" className="form-input" 
+                  placeholder="6-digit code" value={formData.otp} onChange={handleChange} 
+                  maxLength={6} required 
+                />
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  onClick={handleVerifyOtp}
+                  disabled={loading}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  Verify
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Phone Number</label>
@@ -167,6 +277,14 @@ const Signup = () => {
                 type="password" name="password" className="form-input" 
                 placeholder="••••••••" value={formData.password} onChange={handleChange} required 
               />
+              {passwordError && (
+                <p style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '4px' }}>{passwordError}</p>
+              )}
+              {!passwordError && formData.password && (
+                <p style={{ color: 'var(--success)', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <ShieldCheck size={12} /> Strong password
+                </p>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Confirm Password</label>

@@ -1,5 +1,8 @@
 from rest_framework import serializers
+from django.utils import timezone
 from .models import *
+import re
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,6 +21,19 @@ class SignupSerializer(serializers.Serializer):
     department = serializers.CharField(required=False, allow_blank=True)
     staff_id = serializers.CharField(required=False, allow_blank=True)
 
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        if not re.search(r'[A-Z]', value):
+            raise serializers.ValidationError("Password must contain at least one uppercase letter.")
+        if not re.search(r'[a-z]', value):
+            raise serializers.ValidationError("Password must contain at least one lowercase letter.")
+        if not re.search(r'\d', value):
+            raise serializers.ValidationError("Password must contain at least one digit.")
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>+=-]', value):
+            raise serializers.ValidationError("Password must contain at least one special character.")
+        return value
+
     def validate_email(self, value):
         user_exists = CustomUser.objects.filter(email=value).first()
         if user_exists:
@@ -30,7 +46,18 @@ class SignupSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Email already registered. Please login or use another email.")
             else:
                 raise serializers.ValidationError("Email already registered.")
-                
+        
+        # Check if email is verified via OTP
+        otp_record = EmailOTP.objects.filter(
+            email=value, 
+            purpose='signup', 
+            is_verified=True,
+            expires_at__gt=timezone.now()
+        ).first()
+        
+        if not otp_record:
+            raise serializers.ValidationError("Email not verified. Please verify your email with OTP first.")
+            
         return value
 
     def create(self, validated_data):

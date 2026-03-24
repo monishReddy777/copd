@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { doctorVerifyOTP, staffVerifyOTP, doctorForgotPassword, staffForgotPassword } from '../../api/auth';
+import { verifyEmailOTP, forgotPassword } from '../../api/auth';
 import { KeyRound, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -49,19 +49,18 @@ const VerifyOTP = () => {
 
     setLoading(true);
     try {
-      let response;
-      if (role === 'doctor') {
-        response = await doctorVerifyOTP({ email, otp: otpString });
-      } else {
-        response = await staffVerifyOTP({ email, otp: otpString });
-      }
+      const response = await verifyEmailOTP({ 
+        email, 
+        otp: otpString, 
+        purpose: 'forgot_password' 
+      });
       
-      // Navigate to reset password page with token
+      // Navigate to reset password page with OTP
       navigate('/reset-password', { 
         state: { 
           email, 
           role, 
-          token: response.data.reset_token || response.data.token 
+          otp: otpString
         } 
       });
       toast.success('OTP verified successfully');
@@ -76,11 +75,7 @@ const VerifyOTP = () => {
   const handleResend = async () => {
     setResending(true);
     try {
-      if (role === 'doctor') {
-        await doctorForgotPassword({ email });
-      } else {
-        await staffForgotPassword({ email });
-      }
+      await forgotPassword({ email });
       toast.success('OTP resent to your email');
     } catch (error) {
       toast.error('Failed to resend OTP');

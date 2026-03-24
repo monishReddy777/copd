@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { doctorResetPassword, staffResetPassword } from '../../api/auth';
+import { resetPassword } from '../../api/auth';
 import { Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { email, role, token } = location.state || {};
+  const { email, role, otp } = location.state || {};
   
   const [formData, setFormData] = useState({
     new_password: '',
@@ -16,11 +16,11 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!email || !token) {
+    if (!email || !otp) {
       toast.error('Invalid reset session. Please start over.');
       navigate('/forgot-password');
     }
-  }, [email, token, navigate]);
+  }, [email, otp, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,7 +31,7 @@ const ResetPassword = () => {
     }
 
     if (formData.new_password.length < 8) {
-      toast.error('Password must be at least 8 characters');
+      toast.error('Password must be at least 8 characters and meet complexity requirements');
       return;
     }
 
@@ -39,20 +39,16 @@ const ResetPassword = () => {
     try {
       const payload = {
         email,
-        token,
+        otp,
         new_password: formData.new_password
       };
 
-      if (role === 'doctor') {
-        await doctorResetPassword(payload);
-      } else {
-        await staffResetPassword(payload);
-      }
+      await resetPassword(payload);
       
       toast.success('Password reset successfully! Please login.');
       navigate(`/login/${role}`);
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to reset password. Link may have expired.');
+      toast.error(error.response?.data?.error || 'Failed to reset password. OTP may have expired.');
     } finally {
       setLoading(false);
     }
