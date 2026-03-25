@@ -52,11 +52,19 @@ echo [2/5] Installing Python dependencies...
 pip install -r requirements.txt
 pip install numpy
 
-echo [3/5] Running database migrations...
+echo [3/5] Verifying AI Models...
+if not exist ml_model\trained_model\model.pkl (
+    echo [WARNING] AI Device Model (model.pkl) missing! Heuristic fallback will be used.
+)
+if not exist ml_model\trained_model\encoder.pkl (
+    echo [WARNING] AI Encoder (encoder.pkl) missing!
+)
+
+echo [4/5] Running database migrations...
 python manage.py makemigrations api
 python manage.py migrate
 
-echo [4/5] Seeding database with default users...
+echo [5/5] Seeding database with default users...
 python seed_database.py
 
 echo.
@@ -64,13 +72,20 @@ echo ─── Step 2: Setting up Frontend ────────────�
 echo.
 cd ..\frontend
 
-echo [5/5] Installing Node.js dependencies...
+echo [6/6] Installing Node.js dependencies...
 call npm install
 
 echo.
 echo ====================================================
 echo   Setup Complete!
 echo ====================================================
+echo.
+echo   New Features in this version:
+echo   ──────────────────────────────────────────
+echo   1. AI Therapy: Model-driven device recommendations.
+echo   2. SpO2 Alerts: Critical @ 80%, Warning @ 88%.
+echo   3. Smart OTP: Required ONLY for Signup and FIRST Login.
+echo   ──────────────────────────────────────────
 echo.
 echo   To run the application:
 echo.
@@ -87,9 +102,9 @@ echo   Then open http://localhost:5173 in your browser
 echo.
 echo   Login Credentials:
 echo   ──────────────────────────────────────────
-echo   Admin:   admin@cdss.com    / admin123
-echo   Doctor:  doctor@test.com   / doctor123
-echo   Staff:   staff@test.com    / staff123
+echo   Admin:   admin@cdss.com    / admin123  (Direct Login)
+echo   Doctor:  doctor@test.com   / doctor123 (OTP on 1st Login)
+echo   Staff:   staff@test.com    / staff123  (OTP on 1st Login)
 echo   ──────────────────────────────────────────
 echo.
 cd ..
