@@ -71,18 +71,24 @@ const PatientDetail = () => {
   // Build tabs based on role: staff only sees Overview, Vitals, ABG Records
   const tabs = [
     { key: 'overview', label: 'Overview' },
-    { key: 'vitals', label: 'Vitals' },
-    { key: 'abg', label: 'ABG Records' },
+    ...(role === 'staff' ? [
+      { key: 'vitals', label: 'Vitals' },
+      { key: 'abg', label: 'ABG Records' },
+    ] : []),
+    ...(role === 'admin' ? [
+      { key: 'vitals', label: 'Vitals' },
+      { key: 'abg', label: 'ABG Records' },
+    ] : []),
     ...(role === 'doctor' ? [
       { key: 'oxygen', label: 'O₂ Status' },
-      { key: 'clinical', label: 'Clinical Data' },
-      { key: 'therapy', label: 'AI Therapy' },
       { key: 'ai-analysis', label: 'AI Analysis' },
-      { key: 'decision', label: 'Decision Support' },
+      { key: 'therapy', label: 'AI Therapy' },
       { key: 'trends', label: 'ABG Trends' },
       { key: 'escalation', label: 'Escalation' },
     ] : []),
   ];
+
+  const calculatedAge = patient.age || (new Date().getFullYear() - new Date(patient.dob || '1960-01-01').getFullYear());
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
@@ -103,7 +109,7 @@ const PatientDetail = () => {
             <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
               <span>{patient.sex}</span>
               <span>•</span>
-              <span>{patient.age} yrs (DOB: {patient.dob})</span>
+              <span>{calculatedAge} yrs (DOB: {patient.dob})</span>
               <span>•</span>
               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{patient.ward} - Bed {patient.bed_number}</span>
             </div>
@@ -222,15 +228,14 @@ const PatientDetail = () => {
         </div>
       )}
 
-      {activeTab === 'vitals' && <VitalsTab patientId={id} />}
-      {activeTab === 'abg' && <ABGTab patientId={id} />}
-      {activeTab === 'oxygen' && <OxygenTab patientId={id} />}
-      {activeTab === 'clinical' && <ClinicalDataTab patientId={id} patient={patient} />}
+      {role !== 'doctor' && activeTab === 'vitals' && <VitalsTab patientId={id} />}
+      {role !== 'doctor' && activeTab === 'abg' && <ABGTab patientId={id} />}
+      {role === 'doctor' && activeTab === 'oxygen' && <OxygenTab patientId={id} />}
+      {/* clinical and decision tabs removed for doctor */}
       {role === 'doctor' && activeTab === 'therapy' && <TherapyTab patientId={id} />}
       {role === 'doctor' && activeTab === 'ai-analysis' && <AIAnalysisTab patientId={id} />}
-      {role === 'doctor' && activeTab === 'decision' && <DecisionSupportTab patientId={id} patient={patient} onApproval={fetchPatientData} />}
-      {activeTab === 'trends' && <ABGTrendsTab patientId={id} />}
-      {activeTab === 'escalation' && <EscalationTab patientId={id} />}
+      {role === 'doctor' && activeTab === 'trends' && <ABGTrendsTab patientId={id} />}
+      {role === 'doctor' && activeTab === 'escalation' && <EscalationTab patientId={id} />}
 
     </div>
   );

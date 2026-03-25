@@ -12,13 +12,15 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    if (window.confirm("Are you want to log out?")) {
+      logout();
+      navigate('/login');
+    }
   };
 
   const doctorLinks = [
     { to: '/doctor/dashboard', icon: <Home className="nav-icon" />, label: 'Dashboard' },
-    { to: '/doctor/patients', icon: <Users className="nav-icon" />, label: 'My Patients' },
+    { to: '/doctor/patients', icon: <Users className="nav-icon" />, label: 'Patients' },
     { to: '/doctor/alerts', icon: <Bell className="nav-icon" />, label: 'Alerts' },
   ];
 

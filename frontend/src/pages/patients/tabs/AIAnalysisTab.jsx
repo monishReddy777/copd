@@ -11,6 +11,7 @@ const AIAnalysisTab = ({ patientId }) => {
 
   useEffect(() => {
     fetchAIData();
+    fetchTrendData();
   }, [patientId]);
 
   const fetchAIData = async () => {
@@ -138,14 +139,9 @@ const AIAnalysisTab = ({ patientId }) => {
           <h3 style={{ fontSize: '1.125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BarChart3 size={18} color="var(--accent-primary)" /> Trend Analysis
           </h3>
-          {!showTrends && (
-            <button className="btn btn-outline" onClick={fetchTrendData}>
-              <TrendingUp size={16} /> View Trends
-            </button>
-          )}
         </div>
 
-        {showTrends && trendData ? (
+        {trendData ? (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
               {[
@@ -168,7 +164,10 @@ const AIAnalysisTab = ({ patientId }) => {
             )}
           </div>
         ) : (
-          !showTrends && <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Click "View Trends" to load trend analysis data.</p>
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+             <div className="spinner" style={{ margin: '0 auto 10px' }}></div>
+             Loading trend analysis...
+          </div>
         )}
       </div>
     </div>

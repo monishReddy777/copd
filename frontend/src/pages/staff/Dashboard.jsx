@@ -2,132 +2,157 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPatients } from '../../api/patients';
 import { getStaffAlerts } from '../../api/alerts';
-import { HeartPulse, Clock, Activity, AlertCircle } from 'lucide-react';
+import { Bell, Plus, HeartPulse, Activity, FileText, Filter, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../hooks/useAuth';
 
 const StaffDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [patients, setPatients] = useState([]);
-  const [stats, setStats] = useState({ patient_count: 0, pending_vitals: 0 });
+  const [filter, setFilter] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [alertCount, setAlertCount] = useState(0);
 
   useEffect(() => {
-    fetchPatients();
+    fetchData();
   }, []);
 
-  const fetchPatients = async () => {
+  const fetchData = async () => {
     try {
-      const patientsRes = await getPatients();
+      const [patientsRes, alertsRes] = await Promise.all([
+        getPatients(),
+        getStaffAlerts()
+      ]);
       const patientsList = patientsRes.data?.results || patientsRes.data || [];
-      setPatients(patientsList.slice(0, 5));
-      setStats({
-        patient_count: patientsList.length,
-        pending_vitals: patientsList.filter(p => p.status === 'warning' || p.status === 'critical').length,
-      });
+      setPatients(patientsList);
+      
+      const alertsList = alertsRes.data?.results || alertsRes.data || [];
+      setAlertCount(alertsList.length);
     } catch (error) {
-      toast.error('Failed to load pending tasks');
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
+  const filteredPatients = patients.filter(p => filter === 'All' || (p.status || '').toLowerCase() === filter.toLowerCase());
+
   if (loading) return <div className="loader-container"><div className="spinner"></div></div>;
 
   return (
-    <>
-      <div className="page-header">
+    <div style={{ maxWidth: '600px', margin: '0 auto', background: '#F8F9FA', minHeight: '100vh', paddingBottom: '80px', fontFamily: 'Inter, sans-serif' }}>
+      
+      {/* Header */}
+      <div style={{ padding: '32px 24px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1>Staff Dashboard</h1>
-          <p>Your shift overview and pending patient reassessments</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 'bold', color: '#1a1a1a', margin: 0 }}>CLINICAL STAFF</h1>
+          <p style={{ color: '#666', fontSize: '14px', margin: 0, marginTop: '4px' }}>{user?.name || 'Staff Member'}</p>
+        </div>
+        <div 
+          onClick={() => navigate('/staff/alerts')}
+          style={{ 
+            width: '44px', height: '44px', background: '#fff', borderRadius: '22px', 
+            display: 'flex', justifyContent: 'center', alignItems: 'center', 
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)', position: 'relative', cursor: 'pointer' 
+          }}
+        >
+          <Bell size={20} color="#333" />
+          {alertCount > 0 && (
+            <div style={{ 
+              position: 'absolute', top: '10px', right: '10px', width: '8px', height: '8px', 
+              background: '#EF4444', borderRadius: '50%' 
+            }} />
+          )}
         </div>
       </div>
 
-      <div className="stats-grid">
-        <div className="stat-card" onClick={() => navigate('/staff/patients')} style={{ cursor: 'pointer' }}>
-          <div className="stat-card-icon blue">
-            <Activity size={24} />
+      {/* Quick Actions */}
+      <div style={{ padding: '24px 24px 8px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1a1a1a', margin: 0 }}>Quick Actions</h2>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '0 16px' }}>
+        
+        {/* Add Patient */}
+        <div onClick={() => navigate('/staff/patients/add')} style={{ background: '#fff', borderRadius: '24px', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '28px', background: '#F0F9F8', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
+            <Plus size={24} color="#0D9488" />
           </div>
-          <div className="stat-card-value">{stats.patient_count}</div>
-          <div className="stat-card-label">Patients in Ward</div>
+          <span style={{ fontWeight: 'bold', color: '#333', fontSize: '14px' }}>Add Patient</span>
         </div>
 
-        <div className="stat-card" onClick={() => navigate('/staff/patients')}>
-          <div className="stat-card-icon orange">
-            <Clock size={24} />
+        {/* Enter Vitals */}
+        <div onClick={() => navigate('/staff/patients')} style={{ background: '#fff', borderRadius: '24px', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '28px', background: '#EFF6FF', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
+            <HeartPulse size={24} color="#3B82F6" />
           </div>
-          <div className="stat-card-value">{stats.pending_vitals}</div>
-          <div className="stat-card-label">Pending Vitals</div>
+          <span style={{ fontWeight: 'bold', color: '#333', fontSize: '14px' }}>Enter Vitals</span>
         </div>
 
-        <div className="stat-card" onClick={() => navigate('/staff/alerts')}>
-          <div className="stat-card-icon purple">
-            <AlertCircle size={24} />
+        {/* Symptoms */}
+        <div onClick={() => navigate('/staff/patients')} style={{ background: '#fff', borderRadius: '24px', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '28px', background: '#F5F3FF', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
+            <Activity size={24} color="#8B5CF6" />
           </div>
-          <div className="stat-card-value" id="staff-alerts-count">—</div>
-          <div className="stat-card-label">Active Alerts</div>
+          <span style={{ fontWeight: 'bold', color: '#333', fontSize: '14px' }}>Symptoms</span>
+        </div>
+
+        {/* Enter ABG */}
+        <div onClick={() => navigate('/staff/patients')} style={{ background: '#fff', borderRadius: '24px', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '28px', background: '#FFFBEB', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
+            <FileText size={24} color="#D97706" />
+          </div>
+          <span style={{ fontWeight: 'bold', color: '#333', fontSize: '14px' }}>Enter ABG</span>
+        </div>
+
+      </div>
+
+      {/* Reassessment Due */}
+      <div style={{ padding: '32px 24px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1a1a1a', margin: 0 }}>Reassessment Due</h2>
+          <div style={{ background: '#FEF2F2', color: '#EF4444', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+            {filteredPatients.length} Due
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Filter size={16} color="#666" />
+          <select style={{ border: 'none', background: 'transparent', color: '#666', fontSize: '14px', outline: 'none', cursor: 'pointer' }} value={filter} onChange={e => setFilter(e.target.value)}>
+            <option value="All">All</option>
+            <option value="Critical">Critical</option>
+            <option value="Warning">Warning</option>
+            <option value="Stable">Stable</option>
+          </select>
         </div>
       </div>
 
-      <div className="data-grid">
-        <div className="card" style={{ gridColumn: 'span 2' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '20px' }}>Task List: Pending Reassessments</h3>
-          
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Admit Date</th>
-                  <th>Patient Name</th>
-                  <th>Location</th>
-                  <th>Task</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {patients.length === 0 ? (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>No patients assigned</td></tr>
-                ) : patients.map(patient => (
-                  <tr key={patient.id}>
-                    <td>
-                      <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                        {patient.created_at ? new Date(patient.created_at).toLocaleDateString() : 'N/A'}
-                      </span>
-                    </td>
-                    <td><div style={{ fontWeight: 600 }}>{patient.full_name}</div></td>
-                    <td>{patient.ward} • {patient.bed_number}</td>
-                    <td>
-                      <span className="badge" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
-                        Vitals Entry
-                      </span>
-                    </td>
-                    <td>
-                      <button 
-                        className="btn btn-sm btn-primary" 
-                        onClick={() => navigate(`/patients/${patient.id}?tab=vitals`)}
-                      >
-                        Enter Vitals
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {filteredPatients.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 16px', color: '#888', fontSize: '14px' }}>
+            No pending reassessments
           </div>
-        </div>
-
-        <div className="card">
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '20px' }}>Quick Actions</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button className="btn btn-outline" style={{ justifyContent: 'flex-start' }} onClick={() => navigate('/staff/patients')}>
-              <Activity size={18} /> View All Patients
-            </button>
-            <button className="btn btn-outline" style={{ justifyContent: 'flex-start' }} onClick={() => navigate('/staff/alerts')}>
-              <AlertCircle size={18} /> Shift Alerts
-            </button>
+        ) : filteredPatients.map(patient => (
+          <div key={patient.id} 
+               onClick={() => navigate(`/patients/${patient.id}?tab=vitals`)}
+               style={{ background: '#fff', borderRadius: '20px', padding: '16px', display: 'flex', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer' }}>
+            
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#FFFBEB', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
+              <Clock size={24} color="#D97706" />
+            </div>
+            
+            <div style={{ marginLeft: '16px', flex: 1 }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#333' }}>Vitals / ABG Check Due</h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#666' }}>{patient.full_name} • {patient.ward} {patient.bed_number}</p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '12px', fontWeight: 'bold', color: '#EF4444' }}>
+                {patient.status === 'critical' ? 'Immediate Action' : 'Due in 30 mins'}
+              </p>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
-    </>
+
+    </div>
   );
 };
 

@@ -26,12 +26,12 @@ const DoctorDashboard = () => {
       const alertsList = alertsRes.data?.results || alertsRes.data || [];
       
       const criticalCount = alertsList.filter(a => a.severity === 'critical').length;
-      const reassessmentCount = patientsList.filter(p => p.status === 'warning' || p.status === 'critical').length;
+      const warningCount = patientsList.filter(p => p.status === 'warning').length;
       
       setStats({ 
         patient_count: patientsList.length, 
         critical_alerts: criticalCount,
-        pending_reassessments: reassessmentCount
+        warning_patients: warningCount
       });
       setRecentPatients(patientsList.slice(0, 5));
     } catch (error) {
@@ -86,8 +86,8 @@ const DoctorDashboard = () => {
           <div className="stat-card-icon purple">
             <Activity size={24} />
           </div>
-          <div className="stat-card-value">{stats.pending_reassessments}</div>
-          <div className="stat-card-label">Pending Reassessments</div>
+          <div className="stat-card-value">{stats.warning_patients}</div>
+          <div className="stat-card-label">Patients with Warning</div>
         </div>
       </div>
 
@@ -103,9 +103,7 @@ const DoctorDashboard = () => {
               <thead>
                 <tr>
                   <th>Patient Name</th>
-                  <th>Location</th>
                   <th>Clinical Status</th>
-                  <th>Last Updated</th>
                 </tr>
               </thead>
               <tbody>
@@ -114,9 +112,7 @@ const DoctorDashboard = () => {
                     <td>
                       <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{patient.full_name}</div>
                     </td>
-                    <td>{patient.ward} • {patient.bed_number}</td>
                     <td>{getStatusBadge(patient.status || 'stable')}</td>
-                    <td>{new Date(patient.updated_at || patient.created_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -127,9 +123,6 @@ const DoctorDashboard = () => {
         <div className="card">
           <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '20px' }}>Quick Actions</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button className="btn btn-outline" style={{ justifyContent: 'flex-start' }} onClick={() => navigate('/add-patient')}>
-              <Users size={18} /> New Patient Admission
-            </button>
             <button className="btn btn-outline" style={{ justifyContent: 'flex-start', color: 'var(--status-critical)', borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)' }} onClick={() => navigate('/doctor/alerts')}>
               <AlertCircle size={18} /> Review Critical Alerts
             </button>

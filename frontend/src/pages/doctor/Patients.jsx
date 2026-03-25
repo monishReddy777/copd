@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPatients } from '../../api/patients';
-import { Search, HeartPulse, Filter, Clock } from 'lucide-react';
+import { Search, HeartPulse, Filter, Clock, Trash2 } from 'lucide-react';
+import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
 const DoctorPatients = () => {
@@ -40,6 +41,19 @@ const DoctorPatients = () => {
     }
   };
 
+  const handleDeletePatient = async (e, id) => {
+    e.stopPropagation();
+    if (window.confirm('Are you sure you want to remove this patient?')) {
+      try {
+        await api.delete(`/patients/${id}/`);
+        toast.success('Patient removed successfully');
+        fetchPatients();
+      } catch (error) {
+        toast.error('Failed to remove patient');
+      }
+    }
+  };
+
   const filteredPatients = patients.filter(patient => {
     const matchesSearch = patient.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           patient.ward.toLowerCase().includes(searchTerm.toLowerCase());
@@ -51,13 +65,11 @@ const DoctorPatients = () => {
     <>
       <div className="page-header">
         <div>
-          <h1>My Patients</h1>
+          <h1>Patients</h1>
           <p>Monitor and manage your assigned COPD patients</p>
         </div>
         <div className="page-header-actions">
-          <button className="btn btn-primary" onClick={() => navigate('/add-patient')}>
-            Add New Patient
-          </button>
+          {/* Add patient removed */}
         </div>
       </div>
 
@@ -128,6 +140,9 @@ const DoctorPatients = () => {
                   </button>
                   <button className="btn btn-sm btn-primary" style={{ flex: 1 }} onClick={(e) => { e.stopPropagation(); navigate(`/patients/${patient.id}?tab=therapy`); }}>
                     Therapy
+                  </button>
+                  <button className="btn btn-sm btn-outline" style={{ padding: '0 8px', color: 'var(--status-critical)', borderColor: 'rgba(239, 68, 68, 0.3)' }} onClick={(e) => handleDeletePatient(e, patient.id)}>
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>

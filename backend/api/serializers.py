@@ -132,7 +132,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
     staff_profile = StaffSerializer(read_only=True)
     class Meta:
         model = CustomUser
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone_number', 'department', 'is_approved', 'is_active', 'doctor_profile', 'staff_profile')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone_number', 'department', 'is_approved', 'is_active', 'doctor_profile', 'staff_profile', 'profile_image')
 
 class PatientSerializer(serializers.ModelSerializer):
     latest_vitals = serializers.SerializerMethodField()
@@ -185,8 +185,7 @@ class PatientSerializer(serializers.ModelSerializer):
                 'ph': a.ph,
                 'paco2': a.paco2,
                 'pao2': a.pao2,
-                'hco3': a.hco3,
-                'fio2': a.fio2
+                'hco3': a.hco3
             }
         return None
 
@@ -204,6 +203,7 @@ class SpirometryDataSerializer(serializers.ModelSerializer):
     class Meta:
         model = SpirometryData
         fields = '__all__'
+        read_only_fields = ['patient', 'gold_stage']
 
 class ABGDataSerializer(serializers.ModelSerializer):
     class Meta:

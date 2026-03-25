@@ -296,17 +296,19 @@ class VitalsAPIView(APIView):
             
             # AI LOGIC: SpO2
             spo2 = vitals.spo2
-            if spo2 < 88:
+            if spo2 < 80:
                 Alert.objects.create(patient=p, severity='critical', message=f'Critical SpO2 Drop: {spo2}%')
                 p.status = 'critical'
                 # Notify Doctors
                 for doc in CustomUser.objects.filter(role='doctor'):
-                    Notification.objects.create(user=doc, title='Critical Alert', message=f'Patient {p.full_name} SpO2 < 88%')
-            elif 88 <= spo2 <= 92:
+                    Notification.objects.create(user=doc, title='Critical Alert', message=f'Patient {p.full_name} SpO2 < 80%')
+            elif spo2 < 88:
                 Alert.objects.create(patient=p, severity='warning', message=f'Warning SpO2: {spo2}%')
                 p.status = 'warning'
+                # Notify Doctors
+                for doc in CustomUser.objects.filter(role='doctor'):
+                    Notification.objects.create(user=doc, title='Warning SpO2 Alert', message=f'Patient {p.full_name} SpO2 dropped to {spo2}%')
             else:
-                Alert.objects.create(patient=p, severity='normal', message=f'Normal SpO2: {spo2}%')
                 p.status = 'stable'
             p.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)

@@ -19,6 +19,7 @@ def get_ai_prediction(patient_data):
         le = None
         confidence = 85 # Default confidence for heuristic
         
+        ml_device = None
         if os.path.exists(DEVICE_MODEL_PATH) and os.path.exists(ENCODER_PATH):
             try:
                 model = joblib.load(DEVICE_MODEL_PATH)
@@ -37,6 +38,12 @@ def get_ai_prediction(patient_data):
 
                 # Predict with model if loaded
                 try:
+                    preds = model.predict(input_data)
+                    if hasattr(le, 'inverse_transform') and isinstance(preds[0], (int, np.integer)):
+                        ml_device = le.inverse_transform(preds)[0]
+                    else:
+                        ml_device = preds[0]
+                        
                     probs = model.predict_proba(input_data)
                     confidence = int(np.max(probs) * 100)
                 except:
@@ -48,18 +55,33 @@ def get_ai_prediction(patient_data):
         spo2 = patient_data.get('spo2', 95)
         ph = patient_data.get('ph', 7.4)
         
-        if spo2 < 85:
-            rec_device = "Non-Rebreather Mask"
-            flow_rate = "10-15 L/min (60-90%)"
-        elif spo2 < 88 or (ph < 7.35):
-            rec_device = "High-Flow Nasal Cannula (HFNC)"
-            flow_rate = "30-60 L/min"
-        elif spo2 <= 92:
-            rec_device = "Venturi Mask"
-            flow_rate = "24-60% FiO2"
+        if ml_device:
+            rec_device = ml_device
+            # Provide an appropriate flow rate based on the predicted device
+            d = str(rec_device).lower()
+            if 'non-rebreather' in d:
+                flow_rate = "10-15 L/min (60-90%)"
+            elif 'high-flow' in d or 'hfnc' in d:
+                flow_rate = "30-60 L/min"
+            elif 'venturi' in d:
+                flow_rate = "24-60% FiO2"
+            elif 'bipap' in d or 'cpap' in d or 'niv' in d:
+                flow_rate = "NIV Settings Required"
+            else:
+                flow_rate = "1-4 L/min"
         else:
-            rec_device = "Nasal Cannula"
-            flow_rate = "1-4 L/min"
+            if spo2 < 85:
+                rec_device = "Non-Rebreather Mask"
+                flow_rate = "10-15 L/min (60-90%)"
+            elif spo2 < 88 or (ph < 7.35):
+                rec_device = "High-Flow Nasal Cannula (HFNC)"
+                flow_rate = "30-60 L/min"
+            elif spo2 <= 92:
+                rec_device = "Venturi Mask"
+                flow_rate = "24-60% FiO2"
+            else:
+                rec_device = "Nasal Cannula"
+                flow_rate = "1-4 L/min"
 
         return {
             "recommended_device": rec_device,

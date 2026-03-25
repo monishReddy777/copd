@@ -110,9 +110,11 @@ class LoginAPIView(APIView):
             
         tokens = get_tokens_for_user(user)
         
-        # Admin login remains same (no OTP)
-        if user.role == 'admin':
-            print(f"SUCCESS Login: Admin {username} authenticated")
+        # Admin login or subsequent logins (where last_login is already set) skip OTP
+        if user.role == 'admin' or user.last_login is not None:
+            user.last_login = timezone.now()
+            user.save(update_fields=['last_login'])
+            print(f"SUCCESS Login: {user.role} {username} authenticated (No OTP required)")
             return Response({
                 "access": tokens['access'],
                 "refresh": tokens['refresh'],
@@ -120,7 +122,7 @@ class LoginAPIView(APIView):
                 "user_id": user.id
             })
             
-        # Doctor and Staff require OTP
+        # First-time login for Doctor and Staff require OTP
         otp = str(random.randint(100000, 999999))
         expires_at = timezone.now() + timedelta(minutes=10)
         
@@ -202,6 +204,8 @@ class VerifyOTPAPIView(APIView):
             # Return tokens for login
             try:
                 user = CustomUser.objects.get(email=email)
+                user.last_login = timezone.now()
+                user.save(update_fields=['last_login'])
                 tokens = get_tokens_for_user(user)
                 return Response({
                     "access": tokens['access'],
@@ -231,6 +235,11 @@ class ProfileAPIView(APIView):
         if 'first_name' in data: user.first_name = data['first_name']
         if 'last_name' in data: user.last_name = data['last_name']
         if 'phone_number' in data: user.phone_number = data['phone_number']
+        
+        # Handle profile image upload
+        if 'profile_image' in request.FILES:
+            user.profile_image = request.FILES['profile_image']
+            
         user.save()
         
         # Update Role-specific profile
@@ -460,15 +469,18 @@ class VitalsAPIView(APIView):
             
             # AI LOGIC: SpO2
             spo2 = vitals.spo2
-            if spo2 < 88:
+            if spo2 < 80:
                 Alert.objects.create(patient=p, severity='critical', alert_type='SpO2 Drop', message=f'Critical SpO2 Drop: {spo2}% for patient {p.full_name}')
                 p.status = 'critical'
                 # Notify Doctors
                 for doc in CustomUser.objects.filter(role='doctor'):
-                    Notification.objects.create(user=doc, title='Critical SpO2 Alert', message=f'Patient {p.full_name} SpO2 dropped below 88% ({spo2}%)')
-            elif 88 <= spo2 <= 92:
+                    Notification.objects.create(user=doc, title='Critical SpO2 Alert', message=f'Patient {p.full_name} SpO2 dropped below 80% ({spo2}%)')
+            elif spo2 < 88:
                 Alert.objects.create(patient=p, severity='warning', alert_type='SpO2 Falling', message=f'Warning SpO2: {spo2}% for patient {p.full_name}')
                 p.status = 'warning'
+                # Notify Doctors
+                for doc in CustomUser.objects.filter(role='doctor'):
+                    Notification.objects.create(user=doc, title='Warning SpO2 Alert', message=f'Patient {p.full_name} SpO2 dropped to {spo2}%')
             else:
                 p.status = 'stable'
             p.save()
@@ -919,8 +931,8 @@ class TrendAnalysisAPIView(APIView):
     def get(self, request, pk):
         try:
             p = Patient.objects.get(pk=pk)
-            vitals = list(Vitals.objects.filter(patient=p).order_by('-created_at')[:5])
-            abgs = list(ABGData.objects.filter(patient=p).order_by('-created_at')[:5])
+            vitals = list(Vitals.objects.filter(patient=p).order_by('-created_at')[:2])
+            abgs = list(ABGData.objects.filter(patient=p).order_by('-created_at')[:2])
             trends = analyze_trends(vitals, abgs)
             return Response(trends)
         except Patient.DoesNotExist:
@@ -1320,13 +1332,15 @@ class ReassessmentScheduleAPIView(APIView):
             assigned_staff_id = data.get('assigned_staff')
             if assigned_staff_id:
                 try:
-                    staff_user = CustomUser.objects.get(id=assigned_staff_id)
-                    Notification.objects.create(
-                        user=staff_user,
-                        title='Reassessment Scheduled',
-                        message=f'Dr. {request.user.username} scheduled a clinical reassessment for {p.full_name} in {interval} minutes.'
-                    )
-                except CustomUser.DoesNotExist:
+                    staff_member = Staff.objects.get(id=assigned_staff_id)
+                    staff_user = staff_member.user
+                    if staff_user:
+                        Notification.objects.create(
+                            user=staff_user,
+                            title='Reassessment Scheduled',
+                            message=f'Dr. {request.user.username} scheduled a clinical reassessment for {p.full_name} in {interval} minutes.'
+                        )
+                except (Staff.DoesNotExist, Exception):
                     pass
                     
             return Response(serializer.data, status=201)
@@ -1442,7 +1456,6 @@ class ABGTrendsAPIView(APIView):
                 'paco2': a.paco2,
                 'pao2': a.pao2,
                 'hco3': a.hco3,
-                'fio2': a.fio2,
                 'spo2': None # Will try to match from vitals if possible
             })
             

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getPatientABGs, addABG, addSpirometry } from '../../../api/patients';
 import { useAuth } from '../../../hooks/useAuth';
-import { Droplets, Plus, AlertCircle } from 'lucide-react';
+import { Droplets, Plus, AlertCircle, RefreshCw } from 'lucide-react';
+import api from '../../../api/axios';
 import toast from 'react-hot-toast';
 
 const ABGTab = ({ patientId }) => {
@@ -17,13 +18,27 @@ const ABGTab = ({ patientId }) => {
     paco2: '',
     pao2: '',
     hco3: '',
-    fio2: '21',
   });
   const [goldData, setGoldData] = useState({ fev1: '', fev1_fvc: '' });
+  const [savedGoldData, setSavedGoldData] = useState(null);
 
   useEffect(() => {
     fetchABGs();
+    fetchSpirometry();
   }, [patientId]);
+
+  const fetchSpirometry = async () => {
+    try {
+      const { data } = await api.get(`/patients/${patientId}/spirometry/`);
+      // It might be an array or a single object. Get the latest.
+      const latest = Array.isArray(data) ? data[0] : data;
+      if (latest && latest.fev1) {
+        setSavedGoldData(latest);
+      }
+    } catch (e) {
+      // no spirometry data yet
+    }
+  };
 
   const fetchABGs = async () => {
     try {
@@ -51,14 +66,13 @@ const ABGTab = ({ patientId }) => {
         paco2: parseFloat(formData.paco2),
         pao2: parseFloat(formData.pao2),
         hco3: parseFloat(formData.hco3),
-        fio2: parseFloat(formData.fio2),
       };
       
       await addABG(payload);
       toast.success('ABG results recorded successfully');
       fetchABGs();
       setShowForm(false);
-      setFormData({ ph: '', paco2: '', pao2: '', hco3: '', fio2: '21' });
+      setFormData({ ph: '', paco2: '', pao2: '', hco3: '' });
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to record ABG');
     } finally {
@@ -72,6 +86,7 @@ const ABGTab = ({ patientId }) => {
     try {
       await addSpirometry({ patient: patientId, fev1: parseFloat(goldData.fev1), fev1_fvc: parseFloat(goldData.fev1_fvc) });
       toast.success('GOLD Classification recorded');
+      fetchSpirometry();
       setShowGoldForm(false);
       setGoldData({ fev1: '', fev1_fvc: '' });
     } catch (error) {
@@ -139,10 +154,6 @@ const ABGTab = ({ patientId }) => {
                   <label className="form-label">HCO3 (mEq/L)</label>
                   <input type="number" step="0.1" name="hco3" className="form-input" value={formData.hco3} onChange={handleChange} required placeholder="22–26" />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">FiO2 (%)</label>
-                  <input type="number" step="0.1" name="fio2" className="form-input" value={formData.fio2} onChange={handleChange} required placeholder="21" />
-                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
@@ -171,7 +182,6 @@ const ABGTab = ({ patientId }) => {
                   <th>PaCO2</th>
                   <th>PaO2</th>
                   <th>HCO3</th>
-                  <th>FiO2</th>
                 </tr>
               </thead>
               <tbody>
@@ -185,7 +195,6 @@ const ABGTab = ({ patientId }) => {
                     <td>{getCO2Status(abg.paco2)}</td>
                     <td style={{ fontWeight: 600 }}>{abg.pao2} mmHg</td>
                     <td style={{ fontWeight: 600 }}>{abg.hco3} mEq/L</td>
-                    <td>{abg.fio2}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -209,6 +218,27 @@ const ABGTab = ({ patientId }) => {
             </button>
           )}
         </div>
+
+        {savedGoldData && !showGoldForm && (
+          <div style={{ padding: '16px', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)', border: `1px solid ${getGoldStage(parseFloat(savedGoldData.fev1)).color}`, marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Recorded Classification</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: getGoldStage(parseFloat(savedGoldData.fev1)).color }}>
+                {getGoldStage(parseFloat(savedGoldData.fev1)).stage}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', display: 'flex', gap: '16px' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>FEV1</div>
+                <div style={{ fontWeight: 600 }}>{savedGoldData.fev1}%</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>FEV1/FVC</div>
+                <div style={{ fontWeight: 600 }}>{savedGoldData.fev1_fvc}</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showGoldForm && (
           <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '16px' }}>

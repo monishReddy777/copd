@@ -167,63 +167,7 @@ const EscalationTab = ({ patientId }) => {
         </div>
       </div>
 
-      {/* Schedule Reassessment */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showSchedule ? '20px' : 0 }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-            <CalendarPlus size={18} color="var(--accent-primary)" /> Schedule Reassessment
-          </h3>
-          {!showSchedule && (
-            <button className="btn btn-primary" onClick={() => setShowSchedule(true)}>
-              <Clock size={16} /> Schedule Now
-            </button>
-          )}
-        </div>
 
-        {showSchedule && (
-          <form onSubmit={handleScheduleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Reassessment Type</label>
-                <select className="form-select" value={scheduleForm.type} onChange={e => setScheduleForm({...scheduleForm, type: e.target.value})}>
-                  <option value="routine">Routine</option>
-                  <option value="urgent">Urgent</option>
-                  <option value="post_therapy_change">Post Therapy Change</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Interval (minutes)</label>
-                <select className="form-select" value={scheduleForm.interval_minutes} onChange={e => setScheduleForm({...scheduleForm, interval_minutes: parseInt(e.target.value)})}>
-                  <option value={15}>15 minutes</option>
-                  <option value={30}>30 minutes</option>
-                  <option value={60}>1 hour</option>
-                  <option value={120}>2 hours</option>
-                  <option value={240}>4 hours</option>
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Assign To (Staff)</label>
-              <select className="form-select" value={scheduleForm.assigned_staff} onChange={e => setScheduleForm({...scheduleForm, assigned_staff: e.target.value})} required>
-                <option value="">Select Staff Member</option>
-                {staffList.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.department})</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Notes (optional)</label>
-              <textarea className="form-input" rows={2} value={scheduleForm.notes} onChange={e => setScheduleForm({...scheduleForm, notes: e.target.value})} placeholder="Add any special instructions..." />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-              <button type="button" className="btn btn-outline" onClick={() => setShowSchedule(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Scheduling...' : 'Schedule Reassessment'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
     </div>
   );
 };

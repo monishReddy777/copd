@@ -39,4 +39,4 @@ export const postScheduleReassessment = (patientId, data) => api.post(`/patients
 export const getStaffChecklist = () => api.get('/staff-checklist/');
 export const getStaffReassessmentValues = (id) => api.get(`/patient/staff-reassessments/${id}/`);
 export const getReassessmentSchedule = (patientId) => api.get(`/patients/${patientId}/reassessment-schedule/`);
-export const getStaffList = () => api.get('/staff/list/');
+export const getStaffList = () => api.get('/staff-list/');

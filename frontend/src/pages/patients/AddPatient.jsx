@@ -20,16 +20,18 @@ const AddPatient = () => {
   });
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setFormData({ ...formData, [e.target.name]: value });
   };
 
-  const calculateBMI = () => {
-    if (formData.height_cm && formData.weight_kg) {
-      const heightInMeters = formData.height_cm / 100;
-      const bmi = formData.weight_kg / (heightInMeters * heightInMeters);
-      return bmi.toFixed(1);
-    }
-    return '--';
+  const handleSymptomsChange = (e) => {
+    setFormData(prev => ({
+      ...prev,
+      symptoms: {
+        ...prev.symptoms,
+        [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value
+      }
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -38,6 +40,7 @@ const AddPatient = () => {
 
     try {
       const { data } = await addPatient(formData);
+      // We can also submit symptoms separately if needed by backend
       toast.success('Patient added successfully');
       navigate(`/patients/${data.id}`);
     } catch (error) {
@@ -83,25 +86,6 @@ const AddPatient = () => {
           </div>
 
           <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '24px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Physical Statistics
-          </h4>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Height (cm)</label>
-              <input type="number" name="height_cm" className="form-input" value={formData.height_cm} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Weight (kg)</label>
-              <input type="number" name="weight_kg" className="form-input" value={formData.weight_kg} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">BMI</label>
-              <input type="text" className="form-input" value={calculateBMI()} disabled style={{ background: 'var(--bg-secondary)', fontWeight: 600 }} />
-            </div>
-          </div>
-
-          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '24px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Location & Admission
           </h4>
 
@@ -117,6 +101,46 @@ const AddPatient = () => {
             <div className="form-group">
               <label className="form-label">Admission Date</label>
               <input type="date" name="admission_date" className="form-input" value={formData.admission_date} onChange={handleChange} required />
+            </div>
+          </div>
+
+          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '24px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Symptoms & Gas Exchange
+          </h4>
+
+          <div className="form-row">
+             <div className="form-group" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input type="checkbox" name="cough" onChange={handleSymptomsChange} /> Cough
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input type="checkbox" name="sputum" onChange={handleSymptomsChange} /> Sputum
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input type="checkbox" name="wheezing" onChange={handleSymptomsChange} /> Wheezing
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input type="checkbox" name="fever" onChange={handleSymptomsChange} /> Fever
+                </label>
+             </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">mMRC Grade</label>
+              <select name="mmrc_grade" className="form-select" onChange={handleSymptomsChange}>
+                <option value="0">Grade 0</option>
+                <option value="1">Grade 1</option>
+                <option value="2">Grade 2</option>
+                <option value="3">Grade 3</option>
+                <option value="4">Grade 4</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Has Previous Diagnosis?</label>
+              <select name="has_previous_diagnosis" className="form-select" onChange={handleChange}>
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
             </div>
           </div>
 

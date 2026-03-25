@@ -11,6 +11,7 @@ class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=15, blank=True, null=True)
     department = models.CharField(max_length=100, blank=True, null=True)
     is_approved = models.BooleanField(default=False) # For Admin Approvals
+    profile_image = models.ImageField(upload_to='avatars/', null=True, blank=True)
 
     class Meta:
         db_table = 'users'
@@ -92,7 +93,6 @@ class ABGData(models.Model):
     pao2 = models.FloatField()
     paco2 = models.FloatField()
     hco3 = models.FloatField()
-    fio2 = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)
 
 class Vitals(models.Model):
