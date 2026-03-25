@@ -15,6 +15,21 @@ if errorlevel 1 goto NO_PYTHON
 node --version >nul 2>&1
 if errorlevel 1 goto NO_NODE
 
+:: ─── MySQL Warning ──────────────────────────────────
+echo [IMPORTANT] Make sure MySQL is running and you have created the database.
+echo.
+echo   Before running this script, open MySQL and run:
+echo     CREATE DATABASE cdss_copd;
+echo.
+echo   Then update backend/backend/settings.py with YOUR credentials.
+echo.
+set /p CONTINUE_CHOICE="Have you done the above? (y/n): "
+if /i not "%CONTINUE_CHOICE%"=="y" (
+    echo Please complete the MySQL setup first.
+    pause
+    exit /b 0
+)
+
 echo.
 echo ─── Step 1: Setting up Backend ────────────────────
 echo.
@@ -45,11 +60,11 @@ echo   (This may take a minute)
 if errorlevel 1 goto PIP_FAIL
 
 "%VENV_PYTHON%" -m pip install numpy
-if errorlevel 1 echo   (Note: numpy install check/skipped)
+if errorlevel 1 echo   - Note: numpy install check/skipped
 
 echo [4/5] Verifying AI Models...
 if not exist "ml_model\trained_model\model.pkl" (
-    echo [WARNING] AI Device Model (model.pkl) missing!
+    echo   [WARNING] AI Device Model model.pkl missing!
 )
 
 echo [5/5] Database Migrations...
@@ -67,6 +82,7 @@ if not exist "%ROOT_DIR%frontend" goto FRONTEND_MISSING
 cd /d "%ROOT_DIR%frontend"
 
 echo [6/6] Installing Node.js dependencies...
+echo   (This may take a minute)
 call npm install
 if errorlevel 1 goto NPM_FAIL
 
