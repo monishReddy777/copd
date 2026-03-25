@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 class SignupSerializer(serializers.Serializer):
     name = serializers.CharField(required=False)
     full_name = serializers.CharField(required=False)
+    username = serializers.CharField(required=True)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
     role = serializers.CharField()
@@ -28,6 +29,11 @@ class SignupSerializer(serializers.Serializer):
             raise serializers.ValidationError("Password must contain at least one digit.")
         if not re.search(r'[!@#$%^&*(),.?":{}|<>+=-]', value):
             raise serializers.ValidationError("Password must contain at least one special character.")
+        return value
+
+    def validate_username(self, value):
+        if CustomUser.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Username is already taken.")
         return value
 
     def validate_email(self, value):
@@ -78,7 +84,7 @@ class SignupSerializer(serializers.Serializer):
 
         # 1. Create auth user in users table
         user = CustomUser.objects.create_user(
-            username=email,
+            username=validated_data['username'],
             email=email,
             password=password,
             first_name=first_name,

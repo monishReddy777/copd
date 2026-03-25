@@ -105,7 +105,7 @@ const AddPatient = () => {
           </div>
 
           <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '24px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Symptoms & Gas Exchange
+            Symptoms
           </h4>
 
           <div className="form-row">

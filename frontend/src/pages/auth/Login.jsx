@@ -12,7 +12,7 @@ const Login = () => {
   
   // Default to doctor if no role provided or invalid role
   const [role, setRole] = useState(urlRole || 'doctor');
-  const [formData, setFormData] = useState({ email: '', password: '', otp: '' });
+  const [formData, setFormData] = useState({ username: '', password: '', otp: '' });
   const [loading, setLoading] = useState(false);
   const [showOtpInput, setShowOtpInput] = useState(false);
 
@@ -80,7 +80,7 @@ const Login = () => {
     setLoading(true);
     try {
       const response = await verifyEmailOTP({ 
-        email: formData.email, 
+        username: formData.username, 
         otp: formData.otp, 
         purpose: 'login' 
       });
@@ -99,7 +99,7 @@ const Login = () => {
 
   const completeLogin = (data) => {
     const token = data.access || data.token;
-    const userData = data.user || data.doctor || data.staff || data.admin || { name: 'User', email: formData.email };
+    const userData = data.user || data.doctor || data.staff || data.admin || { name: 'User', username: formData.username };
     login(token, userData, role);
     toast.success(`Welcome back, ${userData.name || 'User'}!`);
     navigate(`/${role}/dashboard`);
@@ -159,14 +159,14 @@ const Login = () => {
         <form onSubmit={showOtpInput ? handleOtpSubmit : handleSubmit}>
           {!showOtpInput ? (
             <>
-              <div className="form-group">
-                <label className="form-label">Email Address</label>
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Username</label>
                 <input 
-                  type="email" 
-                  name="email"
+                  type="text" 
+                  name="username"
                   className="form-input" 
-                  placeholder={`Enter your ${role} email`}
-                  value={formData.email}
+                  placeholder={`Enter your ${role} username`}
+                  value={formData.username}
                   onChange={handleChange}
                   required
                 />
@@ -194,7 +194,7 @@ const Login = () => {
             </>
           ) : (
             <div className="form-group animate-in">
-              <label className="form-label">Enter OTP Sent to {formData.email}</label>
+              <label className="form-label">Enter OTP Sent to your Email</label>
               <input 
                 type="text" 
                 name="otp"

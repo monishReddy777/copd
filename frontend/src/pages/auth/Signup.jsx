@@ -10,6 +10,7 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -175,7 +176,16 @@ const Signup = () => {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Email Address</label>
+              <label className="form-label">Username</label>
+              <input 
+                type="text" name="username" className="form-input" 
+                placeholder="johndoe123" value={formData.username} onChange={handleChange} required 
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Email Address</label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input 
                   type="email" name="email" className="form-input" 
@@ -200,7 +210,6 @@ const Signup = () => {
                 )}
               </div>
             </div>
-          </div>
 
           {isOtpSent && !isEmailVerified && (
             <div className="form-group animate-in">

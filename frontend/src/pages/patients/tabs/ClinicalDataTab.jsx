@@ -65,14 +65,6 @@ const ClinicalDataTab = ({ patientId, patient }) => {
         />
       </Section>
 
-      {/* Gas Exchange History */}
-      <Section title="Gas Exchange History" icon={<Droplets size={18} color="#8B5CF6" />}>
-        <GasExchangeForm 
-          initialData={patient?.latest_abg}
-          onSubmit={(data) => handleSubmit('Gas Exchange', addGasExchangeHistory, data)} 
-          submitting={submitting['Gas Exchange']} 
-        />
-      </Section>
 
       {/* Current Symptoms */}
       <Section title="Current Symptoms" icon={<Stethoscope size={18} color="#EF4444" />}>

@@ -75,7 +75,7 @@ const OxygenTab = ({ patientId }) => {
       </div>
 
       {/* Device & Flow Info */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
         <div className="card" style={{ textAlign: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-secondary)' }}>
             <Settings size={16} /> Current Device
@@ -87,12 +87,6 @@ const OxygenTab = ({ patientId }) => {
             <Wind size={16} /> Flow Rate
           </div>
           <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>{data.flow_rate || data.flow || '--'}</div>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-secondary)' }}>
-            <Gauge size={16} /> FiO2
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>{data.fio2 || '--'}%</div>
         </div>
       </div>
 

@@ -94,7 +94,15 @@ const StaffProfile = () => {
       <div className="profile-header">
         <label htmlFor="profile-upload" style={{ cursor: 'pointer' }}>
           {previewImage ? (
-            <img src={previewImage.startsWith('http') || previewImage.startsWith('blob') ? previewImage : `http://localhost:8000${previewImage}`} alt="Avatar" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} />
+            <img 
+              src={previewImage.startsWith('http') || previewImage.startsWith('blob') || previewImage.startsWith('data:') 
+                ? previewImage 
+                : previewImage.startsWith('/media/') 
+                  ? `http://localhost:8000${previewImage}` 
+                  : `http://localhost:8000/media/${previewImage}`} 
+              alt="Avatar" 
+              style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} 
+            />
           ) : (
             <div className="profile-avatar-lg" style={{ background: 'var(--status-stable-bg)', color: 'var(--status-stable)', boxShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
               <HeartPulse size={36} />

@@ -96,10 +96,16 @@ const ABGTab = ({ patientId }) => {
     }
   };
 
-  const getGoldStage = (fev1) => {
-    if (fev1 >= 80) return { stage: 'GOLD 1 (Mild)', color: 'var(--status-stable)' };
-    if (fev1 >= 50) return { stage: 'GOLD 2 (Moderate)', color: 'var(--status-warning)' };
-    if (fev1 >= 30) return { stage: 'GOLD 3 (Severe)', color: 'var(--status-warning)' };
+  const getGoldStage = (fev1, ratio) => {
+    // COPD diagnosis requires FEV1/FVC < 0.7
+    const r = parseFloat(ratio || 1.0);
+    const f = parseFloat(fev1 || 0);
+    
+    if (r >= 0.7) return { stage: 'Non-COPD / Normal', color: 'var(--status-stable)' };
+    
+    if (f >= 80) return { stage: 'GOLD 1 (Mild)', color: 'var(--status-stable)' };
+    if (f >= 50) return { stage: 'GOLD 2 (Moderate)', color: '#f59e0b' };
+    if (f >= 30) return { stage: 'GOLD 3 (Severe)', color: '#ef8c00' };
     return { stage: 'GOLD 4 (Very Severe)', color: 'var(--status-critical)' };
   };
 
@@ -223,8 +229,8 @@ const ABGTab = ({ patientId }) => {
           <div style={{ padding: '16px', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)', border: `1px solid ${getGoldStage(parseFloat(savedGoldData.fev1)).color}`, marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Recorded Classification</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: getGoldStage(parseFloat(savedGoldData.fev1)).color }}>
-                {getGoldStage(parseFloat(savedGoldData.fev1)).stage}
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: getGoldStage(savedGoldData.fev1, savedGoldData.fev1_fvc).color }}>
+                {getGoldStage(savedGoldData.fev1, savedGoldData.fev1_fvc).stage}
               </div>
             </div>
             <div style={{ textAlign: 'right', display: 'flex', gap: '16px' }}>
@@ -255,8 +261,8 @@ const ABGTab = ({ patientId }) => {
               </div>
               {goldData.fev1 && (
                 <div style={{ marginBottom: '12px', padding: '10px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-                  <span style={{ color: getGoldStage(parseFloat(goldData.fev1)).color, fontWeight: 700 }}>
-                    {getGoldStage(parseFloat(goldData.fev1)).stage}
+                  <span style={{ color: getGoldStage(goldData.fev1, goldData.fev1_fvc).color, fontWeight: 700 }}>
+                    {getGoldStage(goldData.fev1, goldData.fev1_fvc).stage}
                   </span>
                 </div>
               )}

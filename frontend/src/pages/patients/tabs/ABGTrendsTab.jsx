@@ -131,21 +131,18 @@ const ABGTrendsTab = ({ patientId }) => {
         </ResponsiveContainer>
       </div>
 
-      {/* SpO2 & Heart Rate Chart */}
+      {/* SpO2 Trend Chart */}
       <div className="card">
-        <h4 style={{ marginBottom: '16px', fontWeight: 600 }}>SpO2 & Heart Rate <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Target SpO2: 88-92%)</span></h4>
+        <h4 style={{ marginBottom: '16px', fontWeight: 600 }}>SpO2 Trend <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Target SpO2: 88-92%)</span></h4>
         <ResponsiveContainer width="100%" height={250}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="time" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-            <YAxis yAxisId="left" domain={[75, 100]} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-            <YAxis yAxisId="right" orientation="right" domain={[40, 160]} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+            <YAxis domain={[75, 100]} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
             <Tooltip contentStyle={tooltipStyle} />
-            <Legend />
-            <ReferenceLine yAxisId="left" y={88} stroke="#EF4444" strokeDasharray="5 5" />
-            <ReferenceLine yAxisId="left" y={92} stroke="#F59E0B" strokeDasharray="5 5" />
-            <Line yAxisId="left" type="monotone" dataKey="spo2" stroke="#10B981" strokeWidth={2} dot={{ r: 4, fill: '#10B981' }} name="SpO2 %" connectNulls />
-            <Line yAxisId="right" type="monotone" dataKey="hr" stroke="#F43F5E" strokeWidth={2} dot={{ r: 3, fill: '#F43F5E' }} name="HR (bpm)" connectNulls />
+            <ReferenceLine y={88} stroke="#EF4444" strokeDasharray="5 5" label={{ value: '88%', fill: '#EF4444', fontSize: 10 }} />
+            <ReferenceLine y={92} stroke="#F59E0B" strokeDasharray="5 5" label={{ value: '92%', fill: '#F59E0B', fontSize: 10 }} />
+            <Line type="monotone" dataKey="spo2" stroke="#10B981" strokeWidth={2} dot={{ r: 4, fill: '#10B981' }} name="SpO2 %" connectNulls />
           </LineChart>
         </ResponsiveContainer>
       </div>

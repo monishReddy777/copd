@@ -4,90 +4,80 @@ import pandas as pd
 import numpy as np
 from django.conf import settings
 
-# Paths to models
-MODEL_DIR = os.path.join(settings.BASE_DIR, 'ml_model', 'trained_model')
-DEVICE_MODEL_PATH = os.path.join(MODEL_DIR, 'model.pkl')
-ENCODER_PATH = os.path.join(MODEL_DIR, 'encoder.pkl')
 
 def get_ai_prediction(patient_data):
     """
-    Takes a dictionary of patient vitals/ABGs and returns a risk level and recommendation.
+    Rules-based clinical decision support for COPD oxygen therapy.
+    Follows specific sequence: NIV Check -> Oxygenation Check -> Overrides.
     """
     try:
-        # Load model and encoder if available
-        model = None
-        le = None
-        confidence = 85 # Default confidence for heuristic
-        
-        ml_device = None
-        if os.path.exists(DEVICE_MODEL_PATH) and os.path.exists(ENCODER_PATH):
-            try:
-                model = joblib.load(DEVICE_MODEL_PATH)
-                le = joblib.load(ENCODER_PATH)
-                
-                # Map data to features (SpO2, pH, PaCO2, PaO2, HCO3, Respiratory_Rate, Heart_Rate)
-                input_data = pd.DataFrame([{
-                    "SpO2": patient_data.get('spo2', 95),
-                    "pH": patient_data.get('ph', 7.4),
-                    "PaCO2": patient_data.get('paco2', 40),
-                    "PaO2": patient_data.get('pao2', 85),
-                    "HCO3": patient_data.get('hco3', 24),
-                    "Respiratory_Rate": patient_data.get('resp_rate', 16),
-                    "Heart_Rate": patient_data.get('heart_rate', 75)
-                }])
-
-                # Predict with model if loaded
-                try:
-                    preds = model.predict(input_data)
-                    if hasattr(le, 'inverse_transform') and isinstance(preds[0], (int, np.integer)):
-                        ml_device = le.inverse_transform(preds)[0]
-                    else:
-                        ml_device = preds[0]
-                        
-                    probs = model.predict_proba(input_data)
-                    confidence = int(np.max(probs) * 100)
-                except:
-                    pass
-            except:
-                pass
-
-        # Heuristic rules for 4 specific devices
         spo2 = patient_data.get('spo2', 95)
         ph = patient_data.get('ph', 7.4)
+        paco2 = patient_data.get('paco2', 40)
+        pao2 = patient_data.get('pao2', 85)
+        hco3 = patient_data.get('hco3', 24)
         
-        if ml_device:
-            rec_device = ml_device
-            # Provide an appropriate flow rate based on the predicted device
-            d = str(rec_device).lower()
-            if 'non-rebreather' in d:
-                flow_rate = "10-15 L/min (60-90%)"
-            elif 'high-flow' in d or 'hfnc' in d:
-                flow_rate = "30-60 L/min"
-            elif 'venturi' in d:
-                flow_rate = "24-60% FiO2"
-            elif 'bipap' in d or 'cpap' in d or 'niv' in d:
-                flow_rate = "NIV Settings Required"
+        rec_device = "No treatment needed"
+        flow_rate = "N/A"
+        diagnosis_context = ""
+        is_niv_needed = False
+        
+        # STEP 1: Check for Ventilation Failure (NIV decision)
+        if ph < 7.35:
+            if paco2 > 45:
+                rec_device = "NIV (BiPAP)"
+                is_niv_needed = True
+                if hco3 > 30:
+                    diagnosis_context = "Acute on Chronic Respiratory Failure"
+                else:
+                    diagnosis_context = "Acute Respiratory Failure"
             else:
-                flow_rate = "1-4 L/min"
-        else:
-            if spo2 < 85:
-                rec_device = "Non-Rebreather Mask"
-                flow_rate = "10-15 L/min (60-90%)"
-            elif spo2 < 88 or (ph < 7.35):
-                rec_device = "High-Flow Nasal Cannula (HFNC)"
-                flow_rate = "30-60 L/min"
-            elif spo2 <= 92:
+                diagnosis_context = "Metabolic Acidosis (NO NIV)"
+        elif ph >= 7.35:
+            if paco2 > 45 and hco3 > 30:
+                diagnosis_context = "Chronic compensated COPD (NO NIV)"
+            else:
+                diagnosis_context = "No NIV needed"
+
+        # STEP 2: Oxygenation Decision (ONLY if NIV NOT selected)
+        if not is_niv_needed:
+            if spo2 < 80 or pao2 < 50:
+                rec_device = "NRBM (EMERGENCY - temporary)"
+                flow_rate = "10-15 L/min"
+            elif spo2 < 85:
+                # User preferred: HFNC (if non-COPD), Venturi (if COPD)
                 rec_device = "Venturi Mask"
-                flow_rate = "24-60% FiO2"
-            else:
+                flow_rate = "40-60% FiO2"
+            elif spo2 < 88:
+                rec_device = "Venturi Mask"
+                flow_rate = "24-28% FiO2"
+            elif spo2 <= 94:
                 rec_device = "Nasal Cannula"
                 flow_rate = "1-4 L/min"
+            else:
+                rec_device = "No oxygen needed"
+                flow_rate = "Room Air"
+
+        # STEP 3: Override Rules (VERY IMPORTANT)
+        if is_niv_needed:
+            # NIV override
+            if spo2 < 80:
+                rec_device = "NRBM (Rescue) THEN NIV"
+                flow_rate = "10-15 L/min until NIV stabilized"
+            else:
+                rec_device = "NIV (BiPAP)"
+                flow_rate = "Settings: Titrate FiO2 through NIV to target SpO2 88-92%"
+
+        # STEP 4: Target Oxygen (COPD SAFETY)
+        # Target SpO2 = 88–92%, Avoid over-oxygenation
 
         return {
             "recommended_device": rec_device,
             "flow_rate": flow_rate,
-            "confidence_score": confidence,
-            "risk_level": "HIGH" if spo2 < 88 else "MODERATE" if spo2 < 92 else "LOW"
+            "confidence_score": 99,
+            "risk_level": "CRITICAL" if (is_niv_needed or spo2 < 80) else "HIGH" if spo2 < 88 else "MODERATE" if spo2 < 92 else "LOW",
+            "clinical_context": diagnosis_context,
+            "target_spo2": "88–92% (COPD Safety)"
         }
     except Exception as e:
         return {"error": str(e)}
@@ -95,28 +85,54 @@ def get_ai_prediction(patient_data):
 def analyze_trends(patient_vitals, patient_abgs):
     """
     Analyzes historical data to determine trends.
+    Expected: patient_vitals and patient_abgs are ordered by -created_at (descending)
     """
     if not patient_vitals and not patient_abgs:
         return {"summary": "Insufficient data for trend analysis", "overall_trend": "Stable"}
 
-    # Basic logic: compare latest two entries
+    # Basic logic: compare latest vs previous
     summary = "Patient shows stable respiratory parameters."
     overall = "Stable"
+    spo2_trend = "Stable"
     
+    # Latest is index 0, Previous is index 1
     if len(patient_vitals) >= 2:
-        v1 = patient_vitals[0].spo2
-        v2 = patient_vitals[1].spo2
-        if v1 < v2:
-            summary = "Patient shows declining SpO2 levels."
+        latest = patient_vitals[0]
+        previous = patient_vitals[1]
+        
+        if latest.spo2 < previous.spo2:
+            summary = f"Patient shows declining SpO2 levels (from {previous.spo2}% to {latest.spo2}%)."
             overall = "Worsening"
-        elif v1 > v2:
-            summary = "Patient show improving SpO2 levels."
+            spo2_trend = "Declining"
+        elif latest.spo2 > previous.spo2:
+            summary = f"Patient shows improving SpO2 levels (from {previous.spo2}% to {latest.spo2}%)."
             overall = "Improving"
+            spo2_trend = "Improving"
+        else:
+            summary = f"Patient shows stable SpO2 levels ({latest.spo2}%)."
+            overall = "Stable"
+            spo2_trend = "Stable"
+    elif len(patient_vitals) == 1:
+        summary = f"Initial vitals recorded (SpO2: {patient_vitals[0].spo2}%). More data needed for trend analysis."
+        overall = "Stable"
+        spo2_trend = "Initial"
+
+    # Add ABG Paco2 trend if available
+    paco2_trend = "Stable"
+    if len(patient_abgs) >= 2:
+        latest_abg = patient_abgs[0]
+        prev_abg = patient_abgs[1]
+        if latest_abg.paco2 > prev_abg.paco2 + 2:
+            paco2_trend = "Rising"
+            if overall != "Worsening":
+                summary += " Note: PaCO2 is rising."
+        elif latest_abg.paco2 < prev_abg.paco2 - 2:
+            paco2_trend = "Falling"
 
     return {
         "overall_trend": overall,
-        "spo2_trend": "Improving" if overall == "Improving" else "Declining" if overall == "Worsening" else "Stable",
-        "paco2_trend": "Stable",
+        "spo2_trend": spo2_trend,
+        "paco2_trend": paco2_trend,
         "ph_trend": "Stable",
         "summary": summary
     }

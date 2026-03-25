@@ -57,11 +57,11 @@ const DoctorAlerts = () => {
         </div>
       </div>
 
-      <div className="tabs">
-        <button className={`tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>All Alerts ({alerts.length})</button>
-        <button className={`tab ${filter === 'critical' ? 'active' : ''}`} onClick={() => setFilter('critical')}>Critical ({alerts.filter(a => a.severity === 'critical').length})</button>
-        <button className={`tab ${filter === 'warning' ? 'active' : ''}`} onClick={() => setFilter('warning')}>Warnings ({alerts.filter(a => a.severity === 'warning').length})</button>
-        <button className={`tab ${filter === 'info' ? 'active' : ''}`} onClick={() => setFilter('info')}>Info ({alerts.filter(a => a.severity === 'info').length})</button>
+      <div className="page-header" style={{ marginBottom: '24px' }}>
+        <div>
+          <h1>Clinical Alerts</h1>
+          <p>Real-time notifications for patient status changes</p>
+        </div>
       </div>
 
       {loading ? (

@@ -56,15 +56,9 @@ const StaffAlerts = () => {
           <ArrowLeft size={24} color="#333" />
         </button>
         <h1 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0, color: '#333' }}>Alerts Center</h1>
-        <div style={{ background: '#ffebee', color: '#e57373', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
-          {alerts.filter(a => a.has_actions).length}
-        </div>
       </div>
 
       <div style={{ padding: '0 8px' }}>
-        <h3 style={{ fontSize: '0.75rem', fontWeight: 700, color: '#e57373', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '16px' }}>
-          CRITICAL ALERTS
-        </h3>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {alerts.map(alert => (

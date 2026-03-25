@@ -62,24 +62,15 @@ class LoginAPIView(APIView):
     def post(self, request):
         print(f"DEBUG Login Request Data: {request.data}")
         # Accept both 'username' and 'email' as login identifiers
-        username = request.data.get('username') or request.data.get('email')
+        username = request.data.get('username')
         password = request.data.get('password')
 
         if not username or not password:
             print("ERROR Login: Missing username or password")
             return Response({"error": "Username and password are required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # First try direct username auth
+        # Strictly authenticate by username
         user = authenticate(username=username, password=password)
-
-        # If that fails, try finding them by email and authenticating by their stored username
-        if user is None:
-            try:
-                from .models import CustomUser
-                user_by_email = CustomUser.objects.get(email=username)
-                user = authenticate(username=user_by_email.username, password=password)
-            except Exception:
-                pass
         if user is None:
             print(f"ERROR Login: Invalid credentials for user {username}")
             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -149,12 +140,22 @@ class RequestOTPAPIView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
-        email = request.data.get('email')
-        purpose = request.data.get('purpose', 'signup') # 'signup' or 'login'
+        # Can provide either 'email' or 'username'
+        identifier = request.data.get('email') or request.data.get('username')
+        purpose = request.data.get('purpose', 'signup')
+
+        if not identifier:
+            return Response({"error": "Email or Username is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Resolve email from username if needed
+        email = identifier
+        if '@' not in identifier:
+            user = CustomUser.objects.filter(username=identifier).first()
+            if user:
+                email = user.email
+            else:
+                return Response({"error": "User with this username not found"}, status=status.HTTP_404_NOT_FOUND)
         
-        if not email:
-            return Response({"error": "Email is required"}, status=400)
-            
         # For signup, check if user already exists
         if purpose == 'signup':
             if CustomUser.objects.filter(email=email).exists():
@@ -181,11 +182,20 @@ class VerifyOTPAPIView(APIView):
     
     def post(self, request):
         email = request.data.get('email')
+        username = request.data.get('username')
         otp = request.data.get('otp')
         purpose = request.data.get('purpose', 'signup')
         
+        # Resolve email from username if missing (for login flow)
+        if not email and username:
+            user = CustomUser.objects.filter(username=username).first()
+            if user:
+                email = user.email
+            else:
+                return Response({"error": "User with this username not found"}, status=status.HTTP_404_NOT_FOUND)
+
         if not email or not otp:
-            return Response({"error": "Email and OTP are required"}, status=400)
+            return Response({"error": "Email and OTP are required"}, status=status.HTTP_400_BAD_REQUEST)
             
         otp_record = EmailOTP.objects.filter(
             email=email, 
@@ -222,7 +232,7 @@ class VerifyOTPAPIView(APIView):
 class ProfileAPIView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):
-        serializer = CustomUserSerializer(request.user)
+        serializer = CustomUserSerializer(request.user, context={'request': request})
         return Response(serializer.data)
         
     def put(self, request):
@@ -237,10 +247,17 @@ class ProfileAPIView(APIView):
         if 'phone_number' in data: user.phone_number = data['phone_number']
         
         # Handle profile image upload
+        print(f"DEBUG: Profile update data: {data}")
+        print(f"DEBUG: Profile request FILES: {request.FILES}")
         if 'profile_image' in request.FILES:
-            user.profile_image = request.FILES['profile_image']
+            image_file = request.FILES['profile_image']
+            print(f"DEBUG: Received profile_image: {image_file.name}, size: {image_file.size}")
+            user.profile_image = image_file
+        else:
+            print("DEBUG: No profile_image found in request.FILES")
             
         user.save()
+        print(f"DEBUG: User saved. profile_image path: {user.profile_image.name if user.profile_image else 'None'}")
         
         # Update Role-specific profile
         if role == 'doctor':
@@ -262,7 +279,7 @@ class ProfileAPIView(APIView):
                 stf.save()
             except Staff.DoesNotExist: pass
             
-        return Response(CustomUserSerializer(user).data)
+        return Response(CustomUserSerializer(user, context={'request': request}).data)
 
 # --- ADMIN MODULE ---
 class AdminDashboardAPIView(APIView):
@@ -409,22 +426,39 @@ class AdminApproveUserAPIView(APIView):
 class AdminRejectUserAPIView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
-        if request.user.role != 'admin': return Response(status=403)
+        if request.user.role != 'admin': 
+            return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
+        
         user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({"error": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
         try:
-            u = CustomUser.objects.get(id=user_id)
+            # Handle potential string-to-int conversion
+            try:
+                target_id = int(user_id)
+            except ValueError:
+                return Response({"error": "Invalid user_id format"}, status=status.HTTP_400_BAD_REQUEST)
+                
+            u = CustomUser.objects.get(id=target_id)
             u.is_active = False # Rejecting effectively disables the registration
+            u.is_approved = False # Ensure it stays unapproved
             u.save()
+            
+            # Explicitly mark profile as rejected if it exists
             if u.role == 'doctor' and hasattr(u, 'doctor_profile'):
                 u.doctor_profile.status = 'rejected'
-                u.doctor_profile.is_active = False # Set doctor profile to inactive
+                u.doctor_profile.is_active = False
                 u.doctor_profile.save()
             elif u.role == 'staff' and hasattr(u, 'staff_profile'):
                 u.staff_profile.status = 'rejected'
                 u.staff_profile.save()
-            return Response({"message": "Rejected"})
+                
+            return Response({"message": "Rejected", "user_id": target_id}, status=status.HTTP_200_OK)
         except CustomUser.DoesNotExist:
-            return Response({"error": "User not found"}, status=404)
+            return Response({"error": f"User with ID {user_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # --- PATIENTS MODULE (STAFF & DOCTOR) ---
 class PatientListCreateAPIView(APIView):
@@ -448,6 +482,14 @@ class PatientDetailAPIView(APIView):
             return Response(PatientSerializer(p).data)
         except Patient.DoesNotExist:
             return Response(status=404)
+
+    def delete(self, request, pk):
+        try:
+            p = Patient.objects.get(pk=pk)
+            p.delete()
+            return Response({"message": "Patient deleted successfully"}, status=200)
+        except Patient.DoesNotExist:
+            return Response({"error": "Patient not found"}, status=404)
 
 # --- CLINICAL DATA & AI EXECUTORS ---
 class VitalsAPIView(APIView):
@@ -486,8 +528,12 @@ class VitalsAPIView(APIView):
             p.save()
 
             # TRIGGER AI RECOMMENDATION FOR THERAPY
-            generate_ai_recommendation(p)
-
+            try:
+                generate_ai_recommendation(p)
+            except Exception as ai_err:
+                print(f"DEBUG: AI Recommendation failed for patient {p.id}: {str(ai_err)}")
+                # We don't fail the whole request if only AI fails
+            
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -525,6 +571,15 @@ class ABGDataAPIView(APIView):
 
 class SpirometryAPIView(APIView):
     permission_classes = [IsAuthenticated]
+    
+    def get(self, request, pk):
+        try:
+            p = Patient.objects.get(pk=pk)
+            data = SpirometryData.objects.filter(patient=p).order_by('-created_at')
+            return Response(SpirometryDataSerializer(data, many=True).data)
+        except Patient.DoesNotExist:
+            return Response({"error": "Patient not found"}, status=404)
+
     def post(self, request, pk):
         try: p = Patient.objects.get(pk=pk)
         except: return Response(status=404)
@@ -532,12 +587,18 @@ class SpirometryAPIView(APIView):
         serializer = SpirometryDataSerializer(data=request.data)
         if serializer.is_valid():
             fev1 = serializer.validated_data.get('fev1', 0)
-            gold_stage = 4
+            fev1_fvc = serializer.validated_data.get('fev1_fvc', 1.0)
+            
+            gold_stage = None
             # AI LOGIC: GOLD Classification
-            if fev1 >= 80: gold_stage = 1
-            elif 50 <= fev1 <= 79: gold_stage = 2
-            elif 30 <= fev1 <= 49: gold_stage = 3
-            else: gold_stage = 4
+            # COPD is typically diagnosed when FEV1/FVC < 0.7
+            if fev1_fvc < 0.7:
+                if fev1 >= 80: gold_stage = 1
+                elif 50 <= fev1 <= 79: gold_stage = 2
+                elif 30 <= fev1 <= 49: gold_stage = 3
+                else: gold_stage = 4
+            else:
+                gold_stage = 0 # Non-COPD or Normal by GOLD standards
             
             serializer.save(patient=p, gold_stage=gold_stage)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -546,16 +607,39 @@ class SpirometryAPIView(APIView):
 # Basic CRUD implementations for remaining Models
 class SymptomsAPIView(APIView):
     permission_classes = [IsAuthenticated]
+    
+    def get(self, request, pk):
+        try:
+            p = Patient.objects.get(pk=pk)
+            symptoms = Symptoms.objects.filter(patient=p).order_by('-created_at')
+            return Response(SymptomsSerializer(symptoms, many=True).data)
+        except Patient.DoesNotExist:
+            return Response({"error": "Patient not found"}, status=404)
+
     def post(self, request, pk):
-        p = Patient.objects.get(pk=pk)
-        serializer = SymptomsSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(patient=p)
-            return Response(serializer.data, status=201)
-        return Response(serializer.errors, status=400)
+        try:
+            p = Patient.objects.get(pk=pk)
+            serializer = SymptomsSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(patient=p)
+                return Response(serializer.data, status=201)
+            return Response(serializer.errors, status=400)
+        except Patient.DoesNotExist:
+            return Response({"error": "Patient not found"}, status=404)
 
 class BaselineDetailsAPIView(APIView):
     permission_classes = [IsAuthenticated]
+    
+    def get(self, request, pk):
+        try:
+            p = Patient.objects.get(pk=pk)
+            baseline = getattr(p, 'baseline', None)
+            if baseline:
+                return Response(BaselineDetailsSerializer(baseline).data)
+            return Response({"error": "Baseline details not found"}, status=404)
+        except Patient.DoesNotExist:
+            return Response({"error": "Patient not found"}, status=404)
+
     def post(self, request, pk):
         p = Patient.objects.get(pk=pk)
         serializer = BaselineDetailsSerializer(data=request.data)
@@ -644,10 +728,9 @@ class ManageDoctorDetailAPIView(APIView):
         try:
             doc = Doctor.objects.get(id=pk)
             user = doc.user
-            doc.delete()
+            doc.delete() # Hard delete profile
             if user:
-                user.is_active = False # Revoke login access
-                user.save()
+                user.delete() # Hard delete user so counts are real-time
             return Response({"message": "Doctor removed successfully"})
         except Doctor.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -722,10 +805,9 @@ class ManageStaffDetailAPIView(APIView):
         try:
             staff = Staff.objects.get(id=pk)
             user = staff.user
-            staff.delete()
+            staff.delete() # Hard delete profile
             if user:
-                user.is_active = False # Revoke login access
-                user.save()
+                user.delete() # Hard delete user so counts are real-time
             return Response({"message": "Staff removed successfully"})
         except Staff.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -788,10 +870,10 @@ class AdminDashboardStatsAPIView(APIView):
     def get(self, request):
         try:
             # 1. Total Doctors from 'doctor' table
-            total_doctors = Doctor.objects.count()
+            total_doctors = Doctor.objects.filter(status='active').count()
             
             # 2. Total Staff from 'staff' table
-            total_staff = Staff.objects.count()
+            total_staff = Staff.objects.filter(status='active').count()
             
             # 3. Pending Approvals (Users where is_approved=False)
             # Excluding admin to count only registration requests
@@ -1206,23 +1288,14 @@ class ResetPasswordAPIView(APIView):
 # --- UPDATE PROFILE & OTHER ---
 
 
-class UpdateProfileAPIView(APIView):
+class UpdateProfileAPIView(ProfileAPIView):
     """
     POST /api/update-profile/
     Securely updates profile of current authenticated user.
     """
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request):
-        # We redirect PUT here to the common ProfileAPIView put logic or implement it here
-        # For compatibility with frontend call, we implement PUT.
-        view = ProfileAPIView()
-        return view.put(request)
-        
-    def post(self, request):
-        # Compatibility for POST if used
-        view = ProfileAPIView()
-        return view.put(request)
+    def post(self, request, *args, **kwargs):
+        # Compatibility for POST: treat as PUT
+        return self.put(request, *args, **kwargs)
 
 
 # --- ADDITIONAL FRONTEND-REQUIRED VIEWS ---

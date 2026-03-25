@@ -15,6 +15,7 @@ import DecisionSupportTab from './tabs/DecisionSupportTab';
 import ABGTrendsTab from './tabs/ABGTrendsTab';
 import EscalationTab from './tabs/EscalationTab';
 import ClinicalDataTab from './tabs/ClinicalDataTab';
+import SymptomsTab from './tabs/SymptomsTab';
 
 const PatientDetail = () => {
   const { id } = useParams();
@@ -74,13 +75,16 @@ const PatientDetail = () => {
     ...(role === 'staff' ? [
       { key: 'vitals', label: 'Vitals' },
       { key: 'abg', label: 'ABG Records' },
+      { key: 'symptoms', label: 'Symptoms' },
     ] : []),
     ...(role === 'admin' ? [
       { key: 'vitals', label: 'Vitals' },
       { key: 'abg', label: 'ABG Records' },
+      { key: 'symptoms', label: 'Symptoms' },
     ] : []),
     ...(role === 'doctor' ? [
       { key: 'oxygen', label: 'O₂ Status' },
+      { key: 'symptoms', label: 'Symptoms' },
       { key: 'ai-analysis', label: 'AI Analysis' },
       { key: 'therapy', label: 'AI Therapy' },
       { key: 'trends', label: 'ABG Trends' },
@@ -230,6 +234,7 @@ const PatientDetail = () => {
 
       {role !== 'doctor' && activeTab === 'vitals' && <VitalsTab patientId={id} />}
       {role !== 'doctor' && activeTab === 'abg' && <ABGTab patientId={id} />}
+      {(activeTab === 'symptoms') && <SymptomsTab patientId={id} />}
       {role === 'doctor' && activeTab === 'oxygen' && <OxygenTab patientId={id} />}
       {/* clinical and decision tabs removed for doctor */}
       {role === 'doctor' && activeTab === 'therapy' && <TherapyTab patientId={id} />}
