@@ -1,5 +1,4 @@
 @echo off
-:: use setlocal to keep environment clean, but be careful with DELAYEDEXPANSION
 setlocal enabledelayedexpansion
 
 echo ====================================================
@@ -7,7 +6,6 @@ echo   COPD CDSS - Automated Setup Script (Windows)
 echo ====================================================
 echo.
 
-:: Get current directory with absolute path
 set "BASE_DIR=%~dp0"
 if "!BASE_DIR:~-1!"=="\" set "BASE_DIR=!BASE_DIR:~0,-1!"
 
@@ -19,26 +17,6 @@ if errorlevel 1 goto NO_PYTHON
 node --version >nul 2>&1
 if errorlevel 1 goto NO_NODE
 
-:: ─── Check MySQL Warning ────────────────────────────
-echo [IMPORTANT] Make sure MySQL is running and you have created the database.
-echo.
-echo   Before running this script, open MySQL and run:
-echo     CREATE DATABASE cdss_copd;
-echo.
-echo   Then update backend/backend/settings.py with YOUR credentials:
-echo     - MySQL NAME, USER, PASSWORD
-echo     - EMAIL_HOST_USER: Your Gmail
-echo     - EMAIL_HOST_PASSWORD: Your Gmail App Password (REQUIRED for OTP)
-echo.
-
-set "CONTINUE_CHOICE=n"
-set /p CONTINUE_CHOICE="Have you done the above? (y/n): "
-if /i "!CONTINUE_CHOICE!"=="y" goto START_BACKEND
-echo Please complete the MySQL setup first, then re-run this script.
-pause
-exit /b 0
-
-:START_BACKEND
 echo.
 echo ─── Step 1: Setting up Backend ────────────────────
 echo.
@@ -46,38 +24,41 @@ echo.
 if not exist "!BASE_DIR!\backend" goto BACKEND_MISSING
 cd /d "!BASE_DIR!\backend"
 
-echo [1/5] Creating Python virtual environment...
-if exist venv (
-    echo   (Virtual environment already exists, skipping creation)
-) else (
+echo [1/5] Handling Virtual Environment...
+if not exist venv (
+    echo   - Creating new virtual environment...
     python -m venv venv
     if errorlevel 1 goto VENV_FAIL
+) else (
+    echo   - Virtual environment already exists.
 )
 
-echo [2/5] Activating virtual environment...
-if not exist "venv\Scripts\activate.bat" goto VENV_MISSING
-call venv\Scripts\activate.bat
-if errorlevel 1 goto VENV_FAIL
+:: Verify venv python exists
+set "VENV_PYTHON=venv\Scripts\python.exe"
+if not exist "!VENV_PYTHON!" goto VENV_MISSING
 
-echo [3/5] Installing Python dependencies...
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+echo [2/5] Updating Pip...
+"!VENV_PYTHON!" -m pip install --upgrade pip
+if errorlevel 1 echo   (Note: minor pip upgrade failure ignored)
+
+echo [3/5] Installing dependencies...
+echo   (This may take a minute)
+"!VENV_PYTHON!" -m pip install -r requirements.txt
 if errorlevel 1 goto PIP_FAIL
-pip install numpy
+"!VENV_PYTHON!" -m pip install numpy
+if errorlevel 1 echo   (Note: numpy install check/skipped)
 
 echo [4/5] Verifying AI Models...
 if not exist "ml_model\trained_model\model.pkl" (
     echo [WARNING] AI Device Model (model.pkl) missing! Heuristic fallback will be used.
 )
-if not exist "ml_model\trained_model\encoder.pkl" (
-    echo [WARNING] AI Encoder (encoder.pkl) missing!
-)
 
-echo [5/5] Running migrations and seeding...
-python manage.py makemigrations api
-python manage.py migrate
+echo [5/5] Database Migrations...
+echo   (Make sure MySQL is running and you have created 'cdss_copd' database)
+"!VENV_PYTHON!" manage.py makemigrations api
+"!VENV_PYTHON!" manage.py migrate
 if errorlevel 1 goto MIGRATE_FAIL
-python seed_database.py
+"!VENV_PYTHON!" seed_database.py
 
 echo.
 echo ─── Step 2: Setting up Frontend ──────────────────
@@ -87,6 +68,7 @@ if not exist "!BASE_DIR!\frontend" goto FRONTEND_MISSING
 cd /d "!BASE_DIR!\frontend"
 
 echo [6/6] Installing Node.js dependencies...
+echo   (This may take a minute)
 call npm install
 if errorlevel 1 goto NPM_FAIL
 
@@ -106,33 +88,32 @@ pause
 exit /b 1
 
 :BACKEND_MISSING
-echo [ERROR] 'backend' folder not found in "!BASE_DIR!"
+echo [ERROR] 'backend' folder not found.
 pause
 exit /b 1
 
 :VENV_FAIL
-echo [ERROR] Failed to handle virtual environment. 
-echo If you see 'Access Denied', try running this script as Administrator.
+echo [ERROR] Failed to create venv. Try running as Administrator.
 pause
 exit /b 1
 
 :VENV_MISSING
-echo [ERROR] venv\Scripts\activate.bat not found. Virtual env creation might have failed.
+echo [ERROR] Virtual environment python not found at '!VENV_PYTHON!'
 pause
 exit /b 1
 
 :PIP_FAIL
-echo [ERROR] Failed to install Python requirements.
+echo [ERROR] Failed to install Python dependencies.
 pause
 exit /b 1
 
 :MIGRATE_FAIL
-echo [ERROR] Database migration failed. Check your MySQL connection and credentials.
+echo [ERROR] Database migration failed. Check MySQL connection and credentials in backend/backend/settings.py
 pause
 exit /b 1
 
 :FRONTEND_MISSING
-echo [ERROR] 'frontend' folder not found in "!BASE_DIR!"
+echo [ERROR] 'frontend' folder not found.
 pause
 exit /b 1
 
@@ -147,21 +128,9 @@ echo ====================================================
 echo   Setup Complete!
 echo ====================================================
 echo.
-echo   New Features:
-echo   1. AI Therapy: Model-driven device recommendations.
-echo   2. SpO2 Alerts: Critical @ 80%, Warning @ 88%.
-echo   3. Smart OTP: Required ONLY for Signup and FIRST Login.
-echo.
-echo   To run:
-echo   - Backend: cd backend; venv\Scripts\activate; python manage.py runserver
-echo   - Frontend: cd frontend; npm run dev
-echo.
-echo   Login:
-echo   Admin:   admin@cdss.com    / admin123
-echo   Doctor:  doctor@test.com   / doctor123 (OTP on 1st Login)
-echo   Staff:   staff@test.com    / staff123  (OTP on 1st Login)
+echo   To run the app:
+echo   1. Start Backend: cd backend; venv\Scripts\activate; python manage.py runserver
+echo   2. Start Frontend: cd frontend; npm run dev
 echo.
 cd /d "!BASE_DIR!"
 pause
-
-
