@@ -1,7 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 set "BASE_DIR=%~dp0"
-cd /d "%BASE_DIR%"
+:: Remove trailing backslash if it exists to make path concatenation cleaner
+if "!BASE_DIR:~-1!"=="\" set "BASE_DIR=!BASE_DIR:~0,-1!"
+
+cd /d "!BASE_DIR!"
 
 echo ====================================================
 echo   COPD CDSS - Automated Setup Script (Windows)
@@ -38,8 +41,10 @@ echo     - MySQL NAME, USER, PASSWORD
 echo     - EMAIL_HOST_USER: Your Gmail
 echo     - EMAIL_HOST_PASSWORD: Your Gmail App Password (REQUIRED for OTP)
 echo.
+
+set "CONTINUE="
 set /p CONTINUE="Have you done the above? (y/n): "
-if /i not "%CONTINUE%"=="y" (
+if /i not "!CONTINUE!"=="y" (
     echo Please complete the MySQL setup first, then re-run this script.
     pause
     exit /b 0
@@ -48,12 +53,12 @@ if /i not "%CONTINUE%"=="y" (
 echo.
 echo ─── Step 1: Setting up Backend ────────────────────
 echo.
-if not exist "backend" (
-    echo [ERROR] 'backend' folder not found in %BASE_DIR%
+if not exist "!BASE_DIR!\backend" (
+    echo [ERROR] 'backend' folder not found in "!BASE_DIR!"
     pause
     exit /b 1
 )
-cd /d "%BASE_DIR%\backend" || (echo [ERROR] Could not enter backend folder & pause & exit /b 1)
+cd /d "!BASE_DIR!\backend" || (echo [ERROR] Could not enter backend folder & pause & exit /b 1)
 
 echo [1/5] Creating Python virtual environment...
 python -m venv venv
@@ -88,12 +93,12 @@ python seed_database.py
 echo.
 echo ─── Step 2: Setting up Frontend ──────────────────
 echo.
-if not exist "%BASE_DIR%\frontend" (
-    echo [ERROR] 'frontend' folder not found in %BASE_DIR%
+if not exist "!BASE_DIR!\frontend" (
+    echo [ERROR] 'frontend' folder not found in "!BASE_DIR!"
     pause
     exit /b 1
 )
-cd /d "%BASE_DIR%\frontend" || (echo [ERROR] Could not enter frontend folder & pause & exit /b 1)
+cd /d "!BASE_DIR!\frontend" || (echo [ERROR] Could not enter frontend folder & pause & exit /b 1)
 
 echo [6/6] Installing Node.js dependencies...
 call npm install || (echo [ERROR] Static dependency install failed & pause & exit /b 1)
@@ -130,6 +135,6 @@ echo   Doctor:  doctor@test.com   / doctor123 (OTP on 1st Login)
 echo   Staff:   staff@test.com    / staff123  (OTP on 1st Login)
 echo   ──────────────────────────────────────────
 echo.
-cd /d "%BASE_DIR%"
+cd /d "!BASE_DIR!"
 pause
 
