@@ -71,7 +71,9 @@ echo [5/5] Database Migrations...
 echo   (Make sure MySQL is running and you have created 'cdss_copd' database)
 "%VENV_PYTHON%" manage.py makemigrations api
 "%VENV_PYTHON%" manage.py migrate
-if errorlevel 1 goto MIGRATE_FAIL
+if errorlevel 1 goto MIGRATE_RETRY
+
+:SEED_DB
 "%VENV_PYTHON%" seed_database.py
 
 echo.
@@ -87,6 +89,27 @@ call npm install
 if errorlevel 1 goto NPM_FAIL
 
 goto SETUP_COMPLETE
+
+:: --- RECOVERY LABELS ---
+
+:MIGRATE_RETRY
+echo.
+echo [ERROR] Database migration failed.
+echo This often happens if some tables (like 'email_otp') already exist.
+echo.
+set /p RETRY_CHOICE="Would you like to try 'faking' the initial setup? (y/n): "
+if /i "%RETRY_CHOICE%"=="y" (
+    echo.
+    echo   - Attempting to fake API migrations...
+    "%VENV_PYTHON%" manage.py migrate --fake api
+    echo   - Retrying regular migrations...
+    "%VENV_PYTHON%" manage.py migrate
+    if not errorlevel 1 (
+        echo [SUCCESS] Migrations completed.
+        goto SEED_DB
+    )
+)
+goto MIGRATE_FAIL
 
 :: --- ERROR LABELS ---
 
@@ -122,7 +145,8 @@ pause
 exit /b 1
 
 :MIGRATE_FAIL
-echo [ERROR] Database migration failed.
+echo [ERROR] Database migration failed completely.
+echo Please check your MySQL connection and credentials in backend/backend/settings.py
 pause
 exit /b 1
 
