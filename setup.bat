@@ -74,7 +74,9 @@ echo   (Make sure MySQL is running and you have created 'cdss_copd' database)
 if errorlevel 1 goto MIGRATE_RETRY
 
 :SEED_DB
+echo [5/5] Seeding database...
 "%VENV_PYTHON%" seed_database.py
+if errorlevel 1 goto SEED_FAIL
 
 echo.
 echo ─── Step 2: Setting up Frontend ──────────────────
@@ -95,10 +97,19 @@ goto SETUP_COMPLETE
 :MIGRATE_RETRY
 echo.
 echo [ERROR] Database migration failed.
-echo This often happens if some tables (like 'email_otp') already exist.
 echo.
-set /p RETRY_CHOICE="Would you like to try 'faking' the initial setup? (y/n): "
-if /i "%RETRY_CHOICE%"=="y" (
+echo This usually happens for two reasons:
+echo 1. Tables (like 'email_otp') already exist.
+echo 2. Columns (like 'profile_image') are missing from existing tables.
+echo.
+echo Options:
+echo   [1] Try 'faking' the initial setup (fastest, but might skip columns).
+echo   [2] Manual Fix: Open MySQL and run: DROP DATABASE cdss_copd; CREATE DATABASE cdss_copd;
+echo       Then close this window and run setup.bat again (BEST OPTION).
+echo.
+set /p RECOVERY_CHOICE="Select an option (1-2) or 'q' to quit: "
+
+if "%RECOVERY_CHOICE%"=="1" (
     echo.
     echo   - Attempting to fake API migrations...
     "%VENV_PYTHON%" manage.py migrate --fake api
@@ -108,8 +119,23 @@ if /i "%RETRY_CHOICE%"=="y" (
         echo [SUCCESS] Migrations completed.
         goto SEED_DB
     )
+    goto MIGRATE_FAIL
+)
+if "%RECOVERY_CHOICE%"=="2" (
+    echo Please reset your database in MySQL and rerun this script for a clean start.
+    pause
+    exit /b 0
 )
 goto MIGRATE_FAIL
+
+:SEED_FAIL
+echo.
+echo [ERROR] Database seeding failed.
+echo This usually means your database schema is out of sync with the models.
+echo.
+echo [FIX] The cleanest fix is to DROP and CREATE the database 'cdss_copd' fresh in MySQL.
+pause
+exit /b 1
 
 :: --- ERROR LABELS ---
 
@@ -146,7 +172,7 @@ exit /b 1
 
 :MIGRATE_FAIL
 echo [ERROR] Database migration failed completely.
-echo Please check your MySQL connection and credentials in backend/backend/settings.py
+echo Check your MySQL connection and credentials in backend/backend/settings.py
 pause
 exit /b 1
 
