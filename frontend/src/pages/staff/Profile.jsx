@@ -47,6 +47,10 @@ const StaffProfile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.email.toLowerCase().endsWith('@gmail.com')) {
+      toast.error('Only @gmail.com email addresses are allowed');
+      return;
+    }
     setSaving(true);
     try {
       const parts = formData.name.split(' ');

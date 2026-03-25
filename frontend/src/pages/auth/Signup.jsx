@@ -57,6 +57,10 @@ const Signup = () => {
       toast.error('Please enter your email first');
       return;
     }
+    if (!formData.email.toLowerCase().endsWith('@gmail.com')) {
+      toast.error('Only @gmail.com email addresses are allowed');
+      return;
+    }
     setLoading(true);
     try {
       await requestOTP({ email: formData.email, purpose: 'signup' });

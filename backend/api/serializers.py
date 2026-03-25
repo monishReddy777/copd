@@ -60,6 +60,9 @@ class SignupSerializer(serializers.Serializer):
         if not otp_record:
             raise serializers.ValidationError("Email not verified. Please verify your email with OTP first.")
             
+        if not value.lower().endswith('@gmail.com'):
+            raise serializers.ValidationError("Only @gmail.com email addresses are allowed.")
+
         return value
 
     def create(self, validated_data):

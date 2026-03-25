@@ -241,7 +241,11 @@ class ProfileAPIView(APIView):
         data = request.data
         
         # Update CustomUser fields
-        if 'email' in data: user.email = data['email']
+        if 'email' in data:
+            email = data['email']
+            if not email.lower().endswith('@gmail.com'):
+                return Response({"error": "Only @gmail.com email addresses are allowed."}, status=400)
+            user.email = email
         if 'first_name' in data: user.first_name = data['first_name']
         if 'last_name' in data: user.last_name = data['last_name']
         if 'phone_number' in data: user.phone_number = data['phone_number']
@@ -512,13 +516,13 @@ class VitalsAPIView(APIView):
             # AI LOGIC: SpO2
             spo2 = vitals.spo2
             if spo2 < 80:
-                Alert.objects.create(patient=p, severity='critical', alert_type='SpO2 Drop', message=f'Critical SpO2 Drop: {spo2}% for patient {p.full_name}')
+                Alert.objects.create(patient=p, severity='critical', message=f'Critical SpO2 Drop: {spo2}% for patient {p.full_name}')
                 p.status = 'critical'
                 # Notify Doctors
                 for doc in CustomUser.objects.filter(role='doctor'):
                     Notification.objects.create(user=doc, title='Critical SpO2 Alert', message=f'Patient {p.full_name} SpO2 dropped below 80% ({spo2}%)')
             elif spo2 < 88:
-                Alert.objects.create(patient=p, severity='warning', alert_type='SpO2 Falling', message=f'Warning SpO2: {spo2}% for patient {p.full_name}')
+                Alert.objects.create(patient=p, severity='warning', message=f'Warning SpO2: {spo2}% for patient {p.full_name}')
                 p.status = 'warning'
                 # Notify Doctors
                 for doc in CustomUser.objects.filter(role='doctor'):

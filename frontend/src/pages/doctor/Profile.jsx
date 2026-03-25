@@ -44,6 +44,10 @@ const DoctorProfile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.email.toLowerCase().endswith('@gmail.com')) {
+      toast.error('Only @gmail.com email addresses are allowed');
+      return;
+    }
     setSaving(true);
     try {
       // Split name for CustomUser
