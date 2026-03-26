@@ -75,7 +75,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           ))}
         </div>
         
-        {role !== 'admin' && (
+        {role === 'staff' && (
           <div className="sidebar-section">
             <div className="sidebar-section-title">Clinical</div>
             <NavLink to="/add-patient" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>

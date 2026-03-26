@@ -76,7 +76,7 @@ const Notifications = () => {
   if (loading) return <div className="loader-container"><div className="spinner"></div></div>;
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <>
       <div className="page-header">
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -138,7 +138,7 @@ const Notifications = () => {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 };
 

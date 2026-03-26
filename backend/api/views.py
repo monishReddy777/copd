@@ -110,7 +110,11 @@ class LoginAPIView(APIView):
                 "access": tokens['access'],
                 "refresh": tokens['refresh'],
                 "role": user.role,
-                "user_id": user.id
+                "user": {
+                    "id": user.id,
+                    "name": f"{user.first_name} {user.last_name}".strip() or user.username,
+                    "username": user.username
+                }
             })
             
         # First-time login for Doctor and Staff require OTP
@@ -221,7 +225,11 @@ class VerifyOTPAPIView(APIView):
                     "access": tokens['access'],
                     "refresh": tokens['refresh'],
                     "role": user.role,
-                    "user_id": user.id,
+                    "user": {
+                        "id": user.id,
+                        "name": f"{user.first_name} {user.last_name}".strip() or user.username,
+                        "username": user.username
+                    },
                     "message": "Login successful"
                 })
             except CustomUser.DoesNotExist:
@@ -937,17 +945,17 @@ class AIRiskAPIView(APIView):
             
             # Formulate key factors for the UI
             key_factors = []
-            if vitals and vitals.spo2 < 90:
-                key_factors.append({"factor": "Low SpO2", "value": f"{vitals.spo2}%", "severity": "high"})
+            if vitals and vitals.spo2 < 80:
+                key_factors.append({"factor": "Critical SpO2", "value": f"{vitals.spo2}%", "severity": "high"})
+            elif vitals and vitals.spo2 < 88:
+                key_factors.append({"factor": "Low SpO2 (Warning)", "value": f"{vitals.spo2}%", "severity": "moderate"})
+            
             if abg and abg.paco2 > 45:
                 key_factors.append({"factor": "Hypercapnia", "value": f"{abg.paco2} mmHg", "severity": "high"})
             
             return Response({
-                "risk_level": prediction.get('risk_level', 'MODERATE'),
-                "confidence_score": prediction.get('confidence_score', 75),
+                **prediction,
                 "key_factors": key_factors,
-                "recommended_device": prediction.get('recommended_device'),
-                "flow_rate": prediction.get('flow_rate')
             })
         except Patient.DoesNotExist:
             return Response(status=404)
@@ -1043,14 +1051,11 @@ class DecisionSupportAPIView(APIView):
             
             return Response({
                 "has_data": True if (vitals or abg) else False,
-                "risk_level": prediction.get('risk_level', 'MODERATE'),
-                "confidence_score": prediction.get('confidence_score', 75),
-                "action_level": prediction.get('risk_level', 'WARNING'),
-                "recommendation": f"Consider {prediction.get('recommended_device')} at {prediction.get('flow_rate')}.",
+                **prediction,
                 "overall_status": p.status,
                 "paco2_status": "Rising" if (abg and abg.paco2 > 45) else "Normal",
                 "ph_status": "Dropping" if (abg and abg.ph < 7.35) else "Normal",
-                "spo2_status": "Low" if (vitals and vitals.spo2 < 90) else "Stable",
+                "spo2_status": "Low" if (vitals and vitals.spo2 < 88) else "Stable",
                 "acidosis": 1 if (abg and abg.ph < 7.35) else 0,
                 "hypercapnia": 1 if (abg and abg.paco2 > 45) else 0,
                 "recommendations": RecommendationSerializer(recs, many=True).data

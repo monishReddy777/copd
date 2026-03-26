@@ -299,11 +299,7 @@ const TherapyTab = ({ patientId }) => {
                   <CheckCircle size={18} color={device.color} style={{ position: 'absolute', top: '10px', left: '10px' }} />
                 )}
                 <div style={{ paddingLeft: isSelected ? '24px' : 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '1rem', color: device.color, marginBottom: '6px' }}>{device.name}</div>
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                    Flow: <strong>{device.flow}</strong> · FiO2: <strong>{device.fio2}</strong>
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>{device.indication}</div>
+                  <div style={{ fontWeight: 700, fontSize: '1.1rem', color: device.color, marginBottom: '0' }}>{device.name}</div>
                 </div>
               </div>
             );

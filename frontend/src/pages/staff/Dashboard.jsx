@@ -38,6 +38,21 @@ const StaffDashboard = () => {
 
   const filteredPatients = patients.filter(p => filter === 'All' || (p.status || '').toLowerCase() === filter.toLowerCase());
 
+  const getReassessmentStatus = (scheduledAt) => {
+    if (!scheduledAt) return { text: 'Reassessment Required', color: '#EF4444' };
+    const now = new Date();
+    const scheduled = new Date(scheduledAt);
+    const diffMs = now - scheduled;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    
+    if (diffMins > 0) {
+      return { text: `Overdue by ${diffMins} mins`, color: '#EF4444' };
+    } else {
+      const remainingMins = Math.abs(diffMins);
+      return { text: `Due in ${remainingMins} mins`, color: '#F59E0B' }; // Orange for upcoming
+    }
+  };
+
   if (loading) return <div className="loader-container"><div className="spinner"></div></div>;
 
   return (
@@ -47,7 +62,7 @@ const StaffDashboard = () => {
       <div style={{ padding: '24px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1a1a1a', margin: 0 }}>CLINICAL STAFF DASHBOARD</h1>
-          <p style={{ color: '#666', fontSize: '16px', margin: 0, marginTop: '4px' }}>Welcome back, {user?.name || 'Staff Member'}</p>
+          <p style={{ color: '#666', fontSize: '16px', margin: 0, marginTop: '4px' }}>Welcome, {user?.name || 'Staff Member'}</p>
         </div>
         <div 
           onClick={() => navigate('/staff/alerts')}
@@ -101,7 +116,7 @@ const StaffDashboard = () => {
             <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: '#FFFBEB', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
               <FileText size={28} color="#D97706" />
             </div>
-            <span style={{ fontWeight: 'bold', color: '#333', fontSize: '16px' }}>ABG Analysis</span>
+            <span style={{ fontWeight: 'bold', color: '#333', fontSize: '16px' }}>ABG Entry</span>
           </div>
 
         </div>
@@ -132,31 +147,42 @@ const StaffDashboard = () => {
             <div style={{ textAlign: 'center', padding: '48px 16px', color: '#888', fontSize: '16px', gridColumn: '1 / -1' }}>
               No pending reassessments at this time.
             </div>
-          ) : filteredPatients.map(patient => (
-            <div key={patient.id} 
-                 onClick={() => navigate(`/patients/${patient.id}?tab=vitals`)}
-                 style={{ 
-                   background: '#F9FAFB', borderRadius: '16px', padding: '20px', 
-                   display: 'flex', alignItems: 'center', border: '1px solid #F3F4FB',
-                   cursor: 'pointer', transition: 'all 0.2s' 
-                 }}>
-              
-              <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                <Clock size={28} color="#D97706" />
-              </div>
-              
-              <div style={{ marginLeft: '20px', flex: 1 }}>
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 'bold', color: '#333' }}>Clinical Check Due</h3>
-                <p style={{ margin: '4px 0 0 0', fontSize: '15px', color: '#666' }}>{patient.full_name}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-                  <span style={{ fontSize: '13px', color: '#888' }}>{patient.ward} • Bed {patient.bed_number}</span>
-                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#EF4444' }}>
-                    {patient.status === 'critical' ? 'Urgent Action' : 'Due Soon'}
-                  </span>
+          ) : filteredPatients.map(patient => {
+            const status = getReassessmentStatus(patient.next_reassessment_time);
+            return (
+              <div key={patient.id} 
+                   onClick={() => navigate(`/patients/${patient.id}?tab=vitals`)}
+                   style={{ 
+                     background: '#FFFFFF', borderRadius: '16px', padding: '16px', 
+                     display: 'flex', alignItems: 'center', border: '1px solid #F3F4F6',
+                     cursor: 'pointer', transition: 'all 0.2s',
+                     boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                   }}>
+                
+                <div style={{ 
+                  width: '52px', height: '52px', borderRadius: '12px', 
+                  background: '#FFF7ED', display: 'flex', 
+                  justifyContent: 'center', alignItems: 'center', flexShrink: 0 
+                }}>
+                  <Clock size={24} color="#C2410C" />
+                </div>
+                
+                <div style={{ marginLeft: '16px', flex: 1 }}>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#334155' }}>
+                    {patient.reassessment_type || 'SpO2 Check Due'}
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '14px', color: '#64748B', fontWeight: 500 }}>
+                    {patient.full_name} • Bed {patient.bed_number} • {patient.ward}
+                  </p>
+                  <div style={{ marginTop: '4px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: status.color }}>
+                      {status.text}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

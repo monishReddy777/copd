@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
+from datetime import timedelta
 from .models import *
 import re
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -149,10 +150,34 @@ class PatientSerializer(serializers.ModelSerializer):
     baseline_data = serializers.SerializerMethodField()
     latest_symptoms = serializers.SerializerMethodField()
     latest_spirometry = serializers.SerializerMethodField()
+    next_reassessment_time = serializers.SerializerMethodField()
+    reassessment_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Patient
         fields = '__all__'
+
+    def get_next_reassessment_time(self, obj):
+        # 1. Look for explicit incomplete schedule
+        s = obj.schedules.filter(completed=False).order_by('scheduled_at').first()
+        if s:
+            return s.scheduled_at
+        
+        # 2. Fallback: 60 minutes after the last vital check
+        v = obj.vitals.order_by('-created_at').first()
+        if v:
+            return v.created_at + timedelta(minutes=60)
+            
+        # 3. Last fallback: 60 minutes after patient was created
+        return obj.created_at + timedelta(minutes=60)
+
+    def get_reassessment_type(self, obj):
+        # Default to SpO2 Check Due as shown in the requirement
+        s = obj.schedules.filter(completed=False).order_by('scheduled_at').first()
+        if s:
+            # In a more complex system, we might have a type field on Schedule
+            return "SpO2 Check Due"
+        return "SpO2 Check Due" 
 
     def get_baseline_data(self, obj):
         try:

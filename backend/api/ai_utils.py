@@ -16,68 +16,68 @@ def get_ai_prediction(patient_data):
         paco2 = patient_data.get('paco2', 40)
         pao2 = patient_data.get('pao2', 85)
         hco3 = patient_data.get('hco3', 24)
+        rr = patient_data.get('resp_rate', 20)
         
-        rec_device = "No treatment needed"
-        flow_rate = "N/A"
-        diagnosis_context = ""
-        is_niv_needed = False
-        
-        # STEP 1: Check for Ventilation Failure (NIV decision)
-        if ph < 7.35:
-            if paco2 > 45:
-                rec_device = "NIV (BiPAP)"
-                is_niv_needed = True
-                if hco3 > 30:
-                    diagnosis_context = "Acute on Chronic Respiratory Failure"
-                else:
-                    diagnosis_context = "Acute Respiratory Failure"
-            else:
-                diagnosis_context = "Metabolic Acidosis (NO NIV)"
-        elif ph >= 7.35:
-            if paco2 > 45 and hco3 > 30:
-                diagnosis_context = "Chronic compensated COPD (NO NIV)"
-            else:
-                diagnosis_context = "No NIV needed"
+        rec_device = "Nasal Cannula"
+        flow_rate = "1-4 L/min"
+        risk_level = "LOW"
+        diagnosis_context = "Stable COPD"
 
-        # STEP 2: Oxygenation Decision (ONLY if NIV NOT selected)
-        if not is_niv_needed:
-            if spo2 < 80 or pao2 < 50:
-                rec_device = "NRBM (EMERGENCY - temporary)"
-                flow_rate = "10-15 L/min"
-            elif spo2 < 85:
-                # User preferred: HFNC (if non-COPD), Venturi (if COPD)
-                rec_device = "Venturi Mask"
-                flow_rate = "40-60% FiO2"
-            elif spo2 < 88:
-                rec_device = "Venturi Mask"
-                flow_rate = "24-28% FiO2"
-            elif spo2 <= 94:
-                rec_device = "Nasal Cannula"
-                flow_rate = "1-4 L/min"
-            else:
-                rec_device = "No oxygen needed"
-                flow_rate = "Room Air"
+        # New Clinical Rules Hierarchy
+        if spo2 < 80:
+            rec_device = "Non-Rebreather Mask"
+            flow_rate = "10-15 L/min"
+            risk_level = "CRITICAL"
+            diagnosis_context = "Severe Hypoxemia"
+        elif (ph < 7.35) and (paco2 > 45):
+            rec_device = "Venturi Mask"
+            flow_rate = "24-40% FiO2"
+            risk_level = "HIGH"
+            diagnosis_context = "Respiratory Acidosis / Hypercapnia"
+        elif 80 <= spo2 < 88:
+            rec_device = "Venturi Mask"
+            flow_rate = "24-40% FiO2"
+            risk_level = "HIGH"
+            diagnosis_context = "Moderate Hypoxemia"
+        elif (88 <= spo2 <= 92) and (rr > 28):
+            rec_device = "High-Flow Nasal Cannula"
+            flow_rate = "30-60 L/min"
+            risk_level = "MODERATE"
+            diagnosis_context = "Respiratory Distress / High Work of Breathing"
+        elif spo2 > 94:
+            rec_device = "Nasal Cannula"
+            flow_rate = "Room Air"
+            risk_level = "LOW"
+            diagnosis_context = "Stable / Room Air"
+        # NIV (Non-Invasive Ventilation) Decision Logic
+        if ph < 7.35 and paco2 > 45:
+            niv_status = "BiPAP Indicated"
+            niv_rationale = f"Acute hypercapnic respiratory failure with pH {ph:.2f} (< 7.35) and PaCO2 {paco2:.1f} (> 45 mmHg)."
+            niv_settings = {"ipap": 14, "epap": 4, "backup_rate": 12}
+        else:
+            niv_status = "Not Currently Indicated"
+            niv_rationale = f"pH is {ph:.2f} (Target > 7.35) and PaCO2 is {paco2:.1f}. Continue careful oxygen therapy and monitor."
+            niv_settings = None
 
-        # STEP 3: Override Rules (VERY IMPORTANT)
-        if is_niv_needed:
-            # NIV override
-            if spo2 < 80:
-                rec_device = "NRBM (Rescue) THEN NIV"
-                flow_rate = "10-15 L/min until NIV stabilized"
-            else:
-                rec_device = "NIV (BiPAP)"
-                flow_rate = "Settings: Titrate FiO2 through NIV to target SpO2 88-92%"
-
-        # STEP 4: Target Oxygen (COPD SAFETY)
-        # Target SpO2 = 88–92%, Avoid over-oxygenation
+        # ICU Admission Criteria
+        icu_status = "No ICU Review Required"
+        icu_triggers = []
+        if spo2 < 80:
+            icu_status = "ICU Review Required"
+            icu_triggers.append("SpO2 < 80% on high flow")
 
         return {
             "recommended_device": rec_device,
             "flow_rate": flow_rate,
             "confidence_score": 99,
-            "risk_level": "CRITICAL" if (is_niv_needed or spo2 < 80) else "HIGH" if spo2 < 88 else "MODERATE" if spo2 < 92 else "LOW",
+            "risk_level": risk_level,
             "clinical_context": diagnosis_context,
-            "target_spo2": "88–92% (COPD Safety)"
+            "target_spo2": "88–92% (COPD Safety)",
+            "niv_status": niv_status,
+            "niv_rationale": niv_rationale,
+            "niv_settings": niv_settings,
+            "icu_status": icu_status,
+            "icu_triggers": icu_triggers
         }
     except Exception as e:
         return {"error": str(e)}

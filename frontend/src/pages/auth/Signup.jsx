@@ -25,6 +25,7 @@ const Signup = () => {
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [showTerms, setShowTerms] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -314,9 +315,34 @@ const Signup = () => {
               checked={formData.terms_accepted} onChange={handleChange}
             />
             <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-              I agree to the Terms & Conditions and Privacy Policy
+              I agree to the <button type="button" onClick={() => setShowTerms(true)} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', padding: 0, fontWeight: 600, textDecoration: 'underline', cursor: 'pointer' }}>Terms & Conditions</button> and Privacy Policy
             </span>
           </label>
+
+          {showTerms && (
+            <div style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 1000, padding: '20px'
+            }}>
+              <div className="card" style={{ maxWidth: '500px', background: 'white', borderRadius: '16px', overflow: 'hidden', margin: 0 }}>
+                <div style={{ padding: '24px', borderBottom: '1px solid var(--border-light)' }}>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Terms & Conditions</h2>
+                </div>
+                <div style={{ padding: '24px', maxHeight: '400px', overflowY: 'auto', fontSize: '0.9375rem', lineHeight: 1.6, color: 'var(--text-secondary)' }}>
+                  <p>By using this platform, you agree to:</p>
+                  <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                    <li><strong>Clinical Decision Support:</strong> AI recommendations are for guidance ONLY. Final clinical judgement remains with the doctor.</li>
+                    <li><strong>Data Privacy:</strong> All patient data is strictly confidential and must be handled per hospital protocols.</li>
+                    <li><strong>Account Security:</strong> You are responsible for keeping your credentials secure.</li>
+                  </ul>
+                </div>
+                <div style={{ padding: '24px', textAlign: 'right', borderTop: '1px solid var(--border-light)' }}>
+                  <button type="button" className="btn btn-primary" onClick={() => setShowTerms(false)}>I Understand</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
             {loading ? 'Submitting...' : 'Sign Up'}

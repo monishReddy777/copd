@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 import { getPatients } from '../../api/patients';
 import { getDoctorAlerts } from '../../api/alerts';
 import { Users, AlertCircle, Activity, HeartPulse } from 'lucide-react';
@@ -7,6 +8,7 @@ import toast from 'react-hot-toast';
 
 const DoctorDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [stats, setStats] = useState({ patient_count: 0, critical_alerts: 0, pending_reassessments: 0 });
   const [recentPatients, setRecentPatients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,17 +25,32 @@ const DoctorDashboard = () => {
       ]);
       
       const patientsList = patientsRes.data?.results || patientsRes.data || [];
-      const alertsList = alertsRes.data?.results || alertsRes.data || [];
       
-      const criticalCount = alertsList.filter(a => a.severity === 'critical').length;
-      const warningCount = patientsList.filter(p => p.status === 'warning').length;
+      // Calculate status based on latest SpO2
+      const processedPatients = patientsList.map(p => {
+        const spo2 = p.latest_vitals?.spo2;
+        let pStatus = p.status || 'stable';
+        
+        if (spo2 !== undefined && spo2 !== null) {
+          if (spo2 < 80) pStatus = 'critical';
+          else if (spo2 < 88) pStatus = 'warning';
+          else pStatus = 'stable';
+        }
+        return { ...p, displayStatus: pStatus, spo2 };
+      });
+
+      const criticalCount = processedPatients.filter(p => p.displayStatus === 'critical').length;
+      const warningCount = processedPatients.filter(p => p.displayStatus === 'warning').length;
       
       setStats({ 
         patient_count: patientsList.length, 
         critical_alerts: criticalCount,
         warning_patients: warningCount
       });
-      setRecentPatients(patientsList.slice(0, 5));
+
+      // Filter for those needing attention, fallback to recent if none
+      const needingAttention = processedPatients.filter(p => p.displayStatus !== 'stable');
+      setRecentPatients(needingAttention.length > 0 ? needingAttention.slice(0, 5) : processedPatients.slice(0, 5));
     } catch (error) {
       toast.error('Failed to load dashboard data');
     } finally {
@@ -56,12 +73,10 @@ const DoctorDashboard = () => {
       <div className="page-header">
         <div>
           <h1>Doctor Dashboard</h1>
-          <p>Overview of your assigned patients and clinical alerts</p>
+          <p>Welcome, {user?.name || 'Doctor'}</p>
         </div>
         <div className="page-header-actions">
-          <button className="btn btn-primary" onClick={() => navigate('/add-patient')}>
-            <Users size={18} /> Add Patient
-          </button>
+          {/* Add patient removed for doctors */}
         </div>
       </div>
 
@@ -83,7 +98,7 @@ const DoctorDashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-icon purple">
+          <div className="stat-card-icon orange">
             <Activity size={24} />
           </div>
           <div className="stat-card-value">{stats.warning_patients}</div>
@@ -94,7 +109,7 @@ const DoctorDashboard = () => {
       <div className="data-grid">
         <div className="card" style={{ gridColumn: 'span 2' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600 }}>Recent Patients</h3>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600 }}>Patients Needing Attention</h3>
             <button className="btn btn-ghost" onClick={() => navigate('/doctor/patients')}>View All</button>
           </div>
           
@@ -111,8 +126,13 @@ const DoctorDashboard = () => {
                   <tr key={patient.id} onClick={() => navigate(`/patients/${patient.id}`)} style={{ cursor: 'pointer' }}>
                     <td>
                       <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{patient.full_name}</div>
+                      {patient.spo2 !== undefined && patient.spo2 !== null && (
+                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          SpO2: <span style={{ fontWeight: 600, color: patient.displayStatus === 'critical' ? 'var(--status-critical)' : patient.displayStatus === 'warning' ? 'var(--status-warning)' : 'var(--text-primary)' }}>{patient.spo2}%</span>
+                        </div>
+                      )}
                     </td>
-                    <td>{getStatusBadge(patient.status || 'stable')}</td>
+                    <td>{getStatusBadge(patient.displayStatus)}</td>
                   </tr>
                 ))}
               </tbody>

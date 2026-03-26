@@ -4,6 +4,8 @@ import { updateProfile } from '../../api/auth';
 import { useAuth } from '../../hooks/useAuth';
 import { Stethoscope, User } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ImageCropper from '../../components/common/ImageCropper';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const DoctorProfile = () => {
   const { user, role, login } = useAuth();
@@ -12,6 +14,8 @@ const DoctorProfile = () => {
   const [saving, setSaving] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [showCropper, setShowCropper] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -74,7 +78,13 @@ const DoctorProfile = () => {
       const { data } = await updateProfile(formDataPayload);
       toast.success('Profile updated successfully');
 
-      const updatedUser = { ...user, name: formData.name, email: formData.email, ...data };
+      // Update local preview with the final URL from server
+      if (data.profile_image) {
+        setPreviewImage(data.profile_image);
+        setProfileImage(null); // Clear selected file
+      }
+
+      const updatedUser = { ...user, ...data };
       const token = localStorage.getItem('token');
       if (token) login(token, updatedUser, role);
     } catch (error) {
@@ -82,6 +92,13 @@ const DoctorProfile = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const onCropComplete = (croppedBlob) => {
+    const file = new File([croppedBlob], 'profile.jpg', { type: 'image/jpeg' });
+    setProfileImage(file);
+    setPreviewImage(URL.createObjectURL(croppedBlob));
+    setShowCropper(false);
   };
 
   if (loading) return <div className="loader-container"><div className="spinner"></div></div>;
@@ -99,11 +116,7 @@ const DoctorProfile = () => {
         <label htmlFor="doctor-profile-upload" style={{ cursor: 'pointer' }}>
           {previewImage ? (
             <img
-              src={previewImage.startsWith('http') || previewImage.startsWith('blob') || previewImage.startsWith('data:')
-                ? previewImage
-                : previewImage.startsWith('/media/')
-                  ? `http://localhost:8000${previewImage}`
-                  : `http://localhost:8000/media/${previewImage}`}
+              src={getImageUrl(previewImage)}
               alt="Avatar"
               style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
             />
@@ -114,11 +127,19 @@ const DoctorProfile = () => {
           )}
           <input id="doctor-profile-upload" type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => {
             if (e.target.files && e.target.files[0]) {
-              setProfileImage(e.target.files[0]);
-              setPreviewImage(URL.createObjectURL(e.target.files[0]));
+              setSelectedImage(URL.createObjectURL(e.target.files[0]));
+              setShowCropper(true);
             }
           }} />
         </label>
+
+        {showCropper && (
+          <ImageCropper 
+            image={selectedImage} 
+            onCropComplete={onCropComplete} 
+            onCancel={() => setShowCropper(false)} 
+          />
+        )}
         <div className="profile-info">
           <h2>{formData.name}</h2>
           <p>{formData.specialization || 'Doctor'} <span>• {formData.license_number || 'No License Added'}</span></p>

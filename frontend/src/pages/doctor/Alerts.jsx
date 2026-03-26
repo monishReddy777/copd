@@ -49,7 +49,7 @@ const DoctorAlerts = () => {
   const filteredAlerts = filter === 'all' ? alerts : alerts.filter(a => a.severity === filter);
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+    <div>
       <div className="page-header">
         <div>
           <h1>Clinical Alerts</h1>

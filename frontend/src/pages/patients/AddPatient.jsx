@@ -16,7 +16,8 @@ const AddPatient = () => {
     weight_kg: '',
     ward: '',
     bed_number: '',
-    admission_date: new Date().toISOString().split('T')[0]
+    admission_date: new Date().toISOString().split('T')[0],
+    terms_accepted: false
   });
 
   const handleChange = (e) => {
@@ -36,6 +37,11 @@ const AddPatient = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.terms_accepted) {
+      toast.error('Please accept the Clinical Admission Terms');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -143,6 +149,17 @@ const AddPatient = () => {
               </select>
             </div>
           </div>
+
+          <label className="form-checkbox-group" style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input 
+              type="checkbox" name="terms_accepted" 
+              checked={formData.terms_accepted} onChange={handleChange}
+              style={{ cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+              I confirm that patient consent has been obtained and I accept the <strong>Clinical Admission Terms</strong> (Data Privacy & AI Guidelines)
+            </span>
+          </label>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '24px', borderTop: '1px solid var(--border)', marginTop: '32px', gap: '12px' }}>
             <button type="button" className="btn btn-outline" onClick={() => navigate(-1)}>Cancel</button>

@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { Shield, User, Mail, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getImageUrl } from '../../utils/imageUrl';
+import ImageCropper from '../../components/common/ImageCropper';
 
 const Profile = () => {
   const { user, role, login } = useAuth();
@@ -13,6 +14,8 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [showCropper, setShowCropper] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: ''
@@ -58,8 +61,13 @@ const Profile = () => {
       const { data } = await updateProfile(formDataPayload);
       toast.success('Profile updated successfully');
       
+      if (data.profile_image) {
+        setPreviewImage(data.profile_image);
+        setProfileImage(null);
+      }
+
       // Update AuthContext
-      const updatedUser = { ...user, name: formData.name, email: formData.email, ...data };
+      const updatedUser = { ...user, ...data };
       const token = localStorage.getItem('token');
       if (token) {
         login(token, updatedUser, role);
@@ -69,6 +77,13 @@ const Profile = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const onCropComplete = (croppedBlob) => {
+    const file = new File([croppedBlob], 'profile.jpg', { type: 'image/jpeg' });
+    setProfileImage(file);
+    setPreviewImage(URL.createObjectURL(croppedBlob));
+    setShowCropper(false);
   };
 
   if (loading) {
@@ -99,11 +114,19 @@ const Profile = () => {
           )}
           <input id="profile-upload" type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => {
             if (e.target.files && e.target.files[0]) {
-              setProfileImage(e.target.files[0]);
-              setPreviewImage(URL.createObjectURL(e.target.files[0]));
+              setSelectedImage(URL.createObjectURL(e.target.files[0]));
+              setShowCropper(true);
             }
           }} />
         </label>
+
+        {showCropper && (
+          <ImageCropper 
+            image={selectedImage} 
+            onCropComplete={onCropComplete} 
+            onCancel={() => setShowCropper(false)} 
+          />
+        )}
         <div className="profile-info">
           <h2>{formData.name}</h2>
           <p>{role.toUpperCase()} <span>• Platform Administrator</span></p>

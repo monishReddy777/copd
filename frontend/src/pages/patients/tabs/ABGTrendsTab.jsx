@@ -114,18 +114,36 @@ const ABGTrendsTab = ({ patientId }) => {
         </ResponsiveContainer>
       </div>
 
-      {/* PaCO2 & PaO2 Chart */}
+      {/* PaCO2 Chart */}
       <div className="card">
-        <h4 style={{ marginBottom: '16px', fontWeight: 600 }}>PaCO2 & PaO2 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(mmHg)</span></h4>
+        <h4 style={{ marginBottom: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          PaCO2 Level <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(mmHg) (Normal: 35 – 45)</span>
+        </h4>
         <ResponsiveContainer width="100%" height={250}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="time" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
             <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
             <Tooltip contentStyle={tooltipStyle} />
-            <Legend />
-            <ReferenceLine y={45} stroke="#EF444480" strokeDasharray="5 5" />
+            <ReferenceLine y={35} stroke="#10B981" strokeDasharray="5 5" label={{ value: '35', fill: '#10B981', fontSize: 10 }} />
+            <ReferenceLine y={45} stroke="#EF4444" strokeDasharray="5 5" label={{ value: '45', fill: '#EF4444', fontSize: 10 }} />
             <Line type="monotone" dataKey="paco2" stroke="#EF4444" strokeWidth={2} dot={{ r: 4, fill: '#EF4444' }} name="PaCO2" connectNulls />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* PaO2 Chart */}
+      <div className="card">
+        <h4 style={{ marginBottom: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          PaO2 Level <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(mmHg) (Target: &gt; 60)</span>
+        </h4>
+        <ResponsiveContainer width="100%" height={250}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis dataKey="time" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+            <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+            <Tooltip contentStyle={tooltipStyle} />
+            <ReferenceLine y={60} stroke="#EF4444" strokeDasharray="5 5" label={{ value: '60', fill: '#EF4444', fontSize: 10 }} />
             <Line type="monotone" dataKey="pao2" stroke="#3B82F6" strokeWidth={2} dot={{ r: 4, fill: '#3B82F6' }} name="PaO2" connectNulls />
           </LineChart>
         </ResponsiveContainer>

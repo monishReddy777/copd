@@ -113,22 +113,49 @@ const DoctorPatients = () => {
       ) : (
         <div className="data-grid">
           {filteredPatients.map(patient => {
-            const age = new Date().getFullYear() - new Date(patient.dob || '1960-01-01').getFullYear();
+            const latestVitals = patient.latest_vitals || {};
+            const spo2 = latestVitals.spo2;
+            const rr = latestVitals.rr;
             
+            // Calculate status for display if not explicitly provided
+            let displayStatus = patient.status || 'stable';
+            if (spo2 !== undefined && spo2 !== null) {
+              if (spo2 < 80) displayStatus = 'critical';
+              else if (spo2 < 88) displayStatus = 'warning';
+              else displayStatus = 'stable';
+            }
+
             return (
               <div 
                 key={patient.id} 
                 className="patient-card"
                 onClick={() => navigate(`/patients/${patient.id}`)}
+                style={{ position: 'relative', padding: '24px' }}
               >
-                <div className="patient-card-header">
-                  <div className="patient-card-name">{patient.full_name}</div>
-                  {getStatusBadge(patient.status)}
+                <div className="patient-card-header" style={{ marginBottom: '8px' }}>
+                  <div className="patient-card-name" style={{ fontSize: '1.25rem', fontWeight: 700 }}>{patient.full_name}</div>
+                  <div className={`badge badge-${displayStatus}`} style={{ textTransform: 'uppercase', padding: '4px 12px', fontSize: '0.7rem' }}>
+                    {displayStatus}
+                  </div>
                 </div>
                 
-                <div className="patient-card-meta" style={{ marginBottom: '16px' }}>
-                  <span>{patient.sex} • {age} yrs</span>
-                  <span>{patient.ward} - Bed {patient.bed_number}</span>
+                <div className="patient-card-meta" style={{ marginBottom: '20px', color: '#64748B', fontSize: '1rem', fontWeight: 500 }}>
+                  Ward {patient.ward} • Room {patient.bed_number}
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                  <div style={{ flex: 1, background: '#F8FAFC', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.8125rem', color: '#94A3B8', marginBottom: '4px' }}>SpO2</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: displayStatus === 'critical' ? 'var(--status-critical)' : displayStatus === 'warning' ? 'var(--status-warning)' : '#1E293B' }}>
+                      {spo2 !== undefined && spo2 !== null ? `${spo2}%` : '--'}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, background: '#F8FAFC', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.8125rem', color: '#94A3B8', marginBottom: '4px' }}>Respiratory</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1E293B' }}>
+                      {rr !== undefined && rr !== null ? rr : '--'}
+                    </div>
+                  </div>
                 </div>
                 
                 <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }}>
