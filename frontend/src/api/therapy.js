@@ -33,5 +33,7 @@ export const getEscalationCriteria = (id) => api.get(`/patients/${id}/escalation
 export const scheduleReassessment = (id, data) => api.post(`/patients/${id}/schedule-reassessment/`, data);
 export const getUrgentAction = (id) => api.get(`/patients/${id}/urgent-action/`);
 
-export const acceptTherapy = (id, recommendationId) => api.post(`/patients/${id}/accept-therapy/`, { recommendation_id: recommendationId });
+export const acceptTherapy = (id, recommendationId, data = {}) =>
+  api.post(`/patients/${id}/accept-therapy/`, { recommendation_id: recommendationId, ...data });
+
 export const getStaffList = () => api.get('/staff-list/');

@@ -4,12 +4,15 @@ import { updateProfile } from '../../api/auth';
 import { useAuth } from '../../hooks/useAuth';
 import { Shield, User, Mail, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const Profile = () => {
   const { user, role, login } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [profileImage, setProfileImage] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     email: ''
@@ -24,6 +27,7 @@ const Profile = () => {
       const { data } = await getAdminProfile();
       setProfile(data);
       setFormData({ name: data.name || user.name, email: data.email || user.email });
+      if (data.profile_image) setPreviewImage(data.profile_image);
     } catch (error) {
       toast.error('Failed to load profile');
       setFormData({ name: user.name, email: user.email });
@@ -40,14 +44,18 @@ const Profile = () => {
       const firstName = parts[0];
       const lastName = parts.slice(1).join(' ');
       
-      const payload = {
-        ...formData,
-        first_name: firstName,
-        last_name: lastName,
-        role
-      };
+      const formDataPayload = new FormData();
+      formDataPayload.append('name', formData.name);
+      formDataPayload.append('email', formData.email);
+      formDataPayload.append('first_name', firstName);
+      formDataPayload.append('last_name', lastName);
+      formDataPayload.append('role', role);
+
+      if (profileImage) {
+        formDataPayload.append('profile_image', profileImage);
+      }
       
-      const { data } = await updateProfile(payload);
+      const { data } = await updateProfile(formDataPayload);
       toast.success('Profile updated successfully');
       
       // Update AuthContext
@@ -77,12 +85,29 @@ const Profile = () => {
       </div>
 
       <div className="profile-header">
-        <div className="profile-avatar-lg" style={{ background: 'var(--gradient-purple)', boxShadow: '0 0 20px rgba(139,92,246,0.3)' }}>
-          <Shield size={36} />
-        </div>
+        <label htmlFor="profile-upload" style={{ cursor: 'pointer' }}>
+          {previewImage ? (
+            <img 
+              src={getImageUrl(previewImage)} 
+              alt="Avatar" 
+              style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} 
+            />
+          ) : (
+            <div className="profile-avatar-lg" style={{ background: 'var(--gradient-purple)', boxShadow: '0 0 20px rgba(139,92,246,0.3)' }}>
+              <Shield size={36} />
+            </div>
+          )}
+          <input id="profile-upload" type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => {
+            if (e.target.files && e.target.files[0]) {
+              setProfileImage(e.target.files[0]);
+              setPreviewImage(URL.createObjectURL(e.target.files[0]));
+            }
+          }} />
+        </label>
         <div className="profile-info">
           <h2>{formData.name}</h2>
           <p>{role.toUpperCase()} <span>• Platform Administrator</span></p>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Click avatar to change</p>
         </div>
       </div>
 

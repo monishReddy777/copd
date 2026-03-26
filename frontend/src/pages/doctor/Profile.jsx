@@ -4,12 +4,15 @@ import { updateProfile } from '../../api/auth';
 import { useAuth } from '../../hooks/useAuth';
 import { Stethoscope, User, Calendar, Award } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const DoctorProfile = () => {
   const { user, role, login } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [profileImage, setProfileImage] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -34,6 +37,7 @@ const DoctorProfile = () => {
         specialization: doc.specialization || '',
         license_number: doc.license_number || ''
       });
+      if (data.profile_image) setPreviewImage(data.profile_image);
     } catch (error) {
       toast.error('Failed to load profile');
       setFormData({ name: user.name, email: user.email, phone_number: '', specialization: '', license_number: '' });
@@ -55,14 +59,21 @@ const DoctorProfile = () => {
       const firstName = parts[0];
       const lastName = parts.slice(1).join(' ');
       
-      const payload = {
-        ...formData,
-        first_name: firstName,
-        last_name: lastName,
-        role
-      };
+      const formDataPayload = new FormData();
+      formDataPayload.append('name', formData.name);
+      formDataPayload.append('email', formData.email);
+      formDataPayload.append('phone_number', formData.phone_number);
+      formDataPayload.append('specialization', formData.specialization);
+      formDataPayload.append('license_number', formData.license_number);
+      formDataPayload.append('first_name', firstName);
+      formDataPayload.append('last_name', lastName);
+      formDataPayload.append('role', role);
+
+      if (profileImage) {
+        formDataPayload.append('profile_image', profileImage);
+      }
       
-      const { data } = await updateProfile(payload);
+      const { data } = await updateProfile(formDataPayload);
       toast.success('Profile updated successfully');
       
       // Update local auth state
@@ -88,12 +99,29 @@ const DoctorProfile = () => {
       </div>
 
       <div className="profile-header">
-        <div className="profile-avatar-lg">
-          <Stethoscope size={36} />
-        </div>
+        <label htmlFor="profile-upload" style={{ cursor: 'pointer' }}>
+          {previewImage ? (
+            <img 
+              src={getImageUrl(previewImage)} 
+              alt="Avatar" 
+              style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} 
+            />
+          ) : (
+            <div className="profile-avatar-lg">
+              <Stethoscope size={36} />
+            </div>
+          )}
+          <input id="profile-upload" type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => {
+            if (e.target.files && e.target.files[0]) {
+              setProfileImage(e.target.files[0]);
+              setPreviewImage(URL.createObjectURL(e.target.files[0]));
+            }
+          }} />
+        </label>
         <div className="profile-info">
           <h2>{formData.name}</h2>
           <p>{formData.specialization || 'Doctor'} <span>• {formData.license_number || 'No License Added'}</span></p>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Click avatar to change</p>
         </div>
       </div>
 

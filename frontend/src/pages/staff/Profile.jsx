@@ -4,6 +4,7 @@ import { updateProfile } from '../../api/auth';
 import { useAuth } from '../../hooks/useAuth';
 import { HeartPulse, User, Calendar, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const StaffProfile = () => {
   const { user, role, login } = useAuth();
@@ -99,11 +100,7 @@ const StaffProfile = () => {
         <label htmlFor="profile-upload" style={{ cursor: 'pointer' }}>
           {previewImage ? (
             <img 
-              src={previewImage.startsWith('http') || previewImage.startsWith('blob') || previewImage.startsWith('data:') 
-                ? previewImage 
-                : previewImage.startsWith('/media/') 
-                  ? `http://localhost:8000${previewImage}` 
-                  : `http://localhost:8000/media/${previewImage}`} 
+              src={getImageUrl(previewImage)} 
               alt="Avatar" 
               style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} 
             />

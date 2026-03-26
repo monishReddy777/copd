@@ -1,4 +1,4 @@
-import React from 'react';
+import { getImageUrl } from '../../utils/imageUrl';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { 
@@ -103,8 +103,16 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       </div>
 
       <div className="sidebar-footer">
-        <div className="sidebar-avatar">
-          {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+        <div className="sidebar-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {user?.profile_image ? (
+            <img 
+              src={getImageUrl(user.profile_image)} 
+              alt="Avatar" 
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            />
+          ) : (
+            user?.name ? user.name.charAt(0).toUpperCase() : 'U'
+          )}
         </div>
         <div className="sidebar-user-info">
           <div className="sidebar-user-name">{user?.name || 'User'}</div>
