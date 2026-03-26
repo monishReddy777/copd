@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     fetchNotifications();
@@ -45,7 +44,6 @@ const Notifications = () => {
     toast.success('All notifications marked as read');
   };
 
-  const filtered = filter === 'all' ? notifications : notifications.filter(n => n.type === filter);
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const getIcon = (type) => {
@@ -100,33 +98,19 @@ const Notifications = () => {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="tabs" style={{ marginBottom: '24px', background: 'var(--bg-surface)', padding: '4px', borderRadius: 'var(--radius-lg)' }}>
-        {[
-          { key: 'all', label: 'All' },
-          { key: 'critical', label: 'Critical' },
-          { key: 'warning', label: 'Warning' },
-          { key: 'info', label: 'Info' }
-        ].map(f => (
-          <button key={f.key} className={`tab ${filter === f.key ? 'active' : ''}`}
-            onClick={() => setFilter(f.key)} style={{ flex: 1, padding: '10px' }}>
-            {f.label}
-          </button>
-        ))}
-      </div>
 
       {/* Notifications List */}
-      {filtered.length === 0 ? (
+      {notifications.length === 0 ? (
         <div className="card">
           <div className="empty-state">
             <Bell className="empty-state-icon" />
             <h3>No Notifications</h3>
-            <p>You're all caught up! No {filter !== 'all' ? filter : ''} notifications.</p>
+            <p>You're all caught up! No notifications.</p>
           </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filtered.map(n => (
+          {notifications.map(n => (
             <div key={n.id} className="card" onClick={() => markAsRead(n.id)} style={{
               padding: '16px 20px', cursor: 'pointer', background: getBg(n.type, n.read),
               borderLeft: `4px solid ${n.type === 'critical' ? '#EF4444' : n.type === 'warning' ? '#F59E0B' : '#3B82F6'}`,

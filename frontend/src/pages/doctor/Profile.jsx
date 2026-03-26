@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getDoctorProfile } from '../../api/admin';
 import { updateProfile } from '../../api/auth';
 import { useAuth } from '../../hooks/useAuth';
-import { Stethoscope, User, Calendar, Award } from 'lucide-react';
+import { Stethoscope, User } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getImageUrl } from '../../utils/imageUrl';
 
 const DoctorProfile = () => {
   const { user, role, login } = useAuth();
@@ -30,8 +29,8 @@ const DoctorProfile = () => {
       const { data } = await getDoctorProfile();
       setProfile(data);
       const doc = data.doctor_profile || {};
-      setFormData({ 
-        name: doc.name || `${data.first_name} ${data.last_name}`.trim(), 
+      setFormData({
+        name: doc.name || `${data.first_name} ${data.last_name}`.trim(),
         email: data.email,
         phone_number: data.phone_number || doc.phone || '',
         specialization: doc.specialization || '',
@@ -40,7 +39,7 @@ const DoctorProfile = () => {
       if (data.profile_image) setPreviewImage(data.profile_image);
     } catch (error) {
       toast.error('Failed to load profile');
-      setFormData({ name: user.name, email: user.email, phone_number: '', specialization: '', license_number: '' });
+      setFormData({ name: user?.name || '', email: user?.email || '', phone_number: '', specialization: '', license_number: '' });
     } finally {
       setLoading(false);
     }
@@ -48,17 +47,16 @@ const DoctorProfile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email.toLowerCase().endswith('@gmail.com')) {
+    if (!formData.email.toLowerCase().endsWith('@gmail.com')) {
       toast.error('Only @gmail.com email addresses are allowed');
       return;
     }
     setSaving(true);
     try {
-      // Split name for CustomUser
       const parts = formData.name.split(' ');
       const firstName = parts[0];
       const lastName = parts.slice(1).join(' ');
-      
+
       const formDataPayload = new FormData();
       formDataPayload.append('name', formData.name);
       formDataPayload.append('email', formData.email);
@@ -72,11 +70,10 @@ const DoctorProfile = () => {
       if (profileImage) {
         formDataPayload.append('profile_image', profileImage);
       }
-      
+
       const { data } = await updateProfile(formDataPayload);
       toast.success('Profile updated successfully');
-      
-      // Update local auth state
+
       const updatedUser = { ...user, name: formData.name, email: formData.email, ...data };
       const token = localStorage.getItem('token');
       if (token) login(token, updatedUser, role);
@@ -99,19 +96,23 @@ const DoctorProfile = () => {
       </div>
 
       <div className="profile-header">
-        <label htmlFor="profile-upload" style={{ cursor: 'pointer' }}>
+        <label htmlFor="doctor-profile-upload" style={{ cursor: 'pointer' }}>
           {previewImage ? (
-            <img 
-              src={getImageUrl(previewImage)} 
-              alt="Avatar" 
-              style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} 
+            <img
+              src={previewImage.startsWith('http') || previewImage.startsWith('blob') || previewImage.startsWith('data:')
+                ? previewImage
+                : previewImage.startsWith('/media/')
+                  ? `http://localhost:8000${previewImage}`
+                  : `http://localhost:8000/media/${previewImage}`}
+              alt="Avatar"
+              style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
             />
           ) : (
             <div className="profile-avatar-lg">
               <Stethoscope size={36} />
             </div>
           )}
-          <input id="profile-upload" type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => {
+          <input id="doctor-profile-upload" type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => {
             if (e.target.files && e.target.files[0]) {
               setProfileImage(e.target.files[0]);
               setPreviewImage(URL.createObjectURL(e.target.files[0]));
@@ -138,7 +139,7 @@ const DoctorProfile = () => {
               <input type="email" className="form-input" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} required />
             </div>
           </div>
-          
+
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Phone Number</label>
@@ -149,7 +150,7 @@ const DoctorProfile = () => {
               <input type="text" className="form-input" value={formData.specialization} onChange={(e) => setFormData({...formData, specialization: e.target.value})} />
             </div>
           </div>
-          
+
           <div className="form-group">
             <label className="form-label">License Number</label>
             <input type="text" className="form-input" value={formData.license_number} onChange={(e) => setFormData({...formData, license_number: e.target.value})} />

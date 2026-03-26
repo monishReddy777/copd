@@ -57,13 +57,6 @@ const DoctorAlerts = () => {
         </div>
       </div>
 
-      <div className="page-header" style={{ marginBottom: '24px' }}>
-        <div>
-          <h1>Clinical Alerts</h1>
-          <p>Real-time notifications for patient status changes</p>
-        </div>
-      </div>
-
       {loading ? (
         <div className="loader-container"><div className="spinner"></div></div>
       ) : filteredAlerts.length === 0 ? (
