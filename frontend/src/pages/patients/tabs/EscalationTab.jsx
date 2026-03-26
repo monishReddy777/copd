@@ -9,23 +9,12 @@ const EscalationTab = ({ patientId }) => {
   const [urgent, setUrgent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showSchedule, setShowSchedule] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({ type: 'routine', interval_minutes: 60, notes: '', assigned_staff: '' });
+  const [scheduleForm, setScheduleForm] = useState({ type: 'routine', interval_minutes: 60, notes: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [staffList, setStaffList] = useState([]);
 
   useEffect(() => {
     fetchAllData();
-    fetchStaff();
   }, [patientId]);
-
-  const fetchStaff = async () => {
-    try {
-      const { data } = await getStaffList();
-      setStaffList(data || []);
-    } catch (error) {
-      console.error('Error fetching staff:', error);
-    }
-  };
 
   const fetchAllData = async () => {
     try {

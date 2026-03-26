@@ -51,9 +51,8 @@ const TherapyTab = ({ patientId }) => {
   const [aiDevice, setAiDevice] = useState(null);
   const [showOverride, setShowOverride] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
-  const [staffList, setStaffList] = useState([]);
   const [showSchedule, setShowSchedule] = useState(false);
-  const [scheduleData, setScheduleData] = useState({ interval_minutes: '30', assigned_staff: '' });
+  const [scheduleData, setScheduleData] = useState({ interval_minutes: '30' });
   const [scheduling, setScheduling] = useState(false);
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -61,18 +60,7 @@ const TherapyTab = ({ patientId }) => {
 
   useEffect(() => {
     fetchData();
-    if (userRole === 'doctor') loadStaff();
   }, [patientId]);
-
-  const loadStaff = async () => {
-    try {
-      const { data } = await getStaffList();
-      setStaffList(data);
-    } catch (e) {
-      console.error('Failed to load staff list:', e);
-      toast.error('Could not load staff members');
-    }
-  };
 
   const fetchData = async () => {
     try {
@@ -160,7 +148,6 @@ const TherapyTab = ({ patientId }) => {
     try {
       await postScheduleReassessment(patientId, {
         interval_minutes: parseInt(scheduleData.interval_minutes),
-        assigned_staff: scheduleData.assigned_staff,
       });
       toast.success(`Reassessment scheduled in ${scheduleData.interval_minutes} minutes. Staff notified.`);
       setShowSchedule(false);
@@ -208,7 +195,7 @@ const TherapyTab = ({ patientId }) => {
             <h4 style={{ marginBottom: '16px', fontWeight: 600 }}>Schedule Staff Reassessment</h4>
             <form onSubmit={handleScheduleReassessment}>
               <div className="form-row">
-                <div className="form-group">
+                <div className="form-group" style={{ flex: 1 }}>
                   <label className="form-label">Reassessment Interval</label>
                   <select className="form-select" value={scheduleData.interval_minutes}
                     onChange={e => setScheduleData({ ...scheduleData, interval_minutes: e.target.value })} required>
@@ -216,16 +203,6 @@ const TherapyTab = ({ patientId }) => {
                     <option value="60">1 hour</option>
                     <option value="120">2 hours</option>
                     <option value="240">4 hours</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Assign To (Staff)</label>
-                  <select className="form-select" value={scheduleData.assigned_staff}
-                    onChange={e => setScheduleData({ ...scheduleData, assigned_staff: e.target.value })} required>
-                    <option value="">Select Staff Member</option>
-                    {staffList.map(s => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.department})</option>
-                    ))}
                   </select>
                 </div>
               </div>

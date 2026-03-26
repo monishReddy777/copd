@@ -1411,20 +1411,18 @@ class ReassessmentScheduleAPIView(APIView):
         if serializer.is_valid():
             schedule = serializer.save()
             
-            # Notify Assigned Staff
-            assigned_staff_id = data.get('assigned_staff')
-            if assigned_staff_id:
-                try:
-                    staff_member = Staff.objects.get(id=assigned_staff_id)
-                    staff_user = staff_member.user
-                    if staff_user:
+            # Notify ALL Active Staff
+            try:
+                active_staff = Staff.objects.filter(status='active').select_related('user')
+                for staff_member in active_staff:
+                    if staff_member.user:
                         Notification.objects.create(
-                            user=staff_user,
-                            title='Reassessment Scheduled',
+                            user=staff_member.user,
+                            title='New Reassessment Task',
                             message=f'Dr. {request.user.username} scheduled a clinical reassessment for {p.full_name} in {interval} minutes.'
                         )
-                except (Staff.DoesNotExist, Exception):
-                    pass
+            except Exception as e:
+                print(f"Failed to send mass notifications: {e}")
                     
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)

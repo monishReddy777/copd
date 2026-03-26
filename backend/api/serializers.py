@@ -284,10 +284,9 @@ class AlertSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ReassessmentScheduleSerializer(serializers.ModelSerializer):
-    staff_name = serializers.CharField(source='assigned_staff.name', read_only=True)
     class Meta:
         model = ReassessmentSchedule
-        fields = ['id', 'patient', 'assigned_staff', 'staff_name', 'interval_minutes', 'scheduled_at', 'completed', 'created_at']
+        fields = ['id', 'patient', 'interval_minutes', 'scheduled_at', 'completed', 'created_at']
 
 class ReassessmentChecklistSerializer(serializers.ModelSerializer):
     class Meta:
