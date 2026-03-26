@@ -251,37 +251,38 @@ class ProfileAPIView(APIView):
         if 'phone_number' in data: user.phone_number = data['phone_number']
         
         # Handle profile image upload
-        print(f"DEBUG: Profile update data: {data}")
-        print(f"DEBUG: Profile request FILES: {request.FILES}")
         if 'profile_image' in request.FILES:
-            image_file = request.FILES['profile_image']
-            print(f"DEBUG: Received profile_image: {image_file.name}, size: {image_file.size}")
-            user.profile_image = image_file
-        else:
-            print("DEBUG: No profile_image found in request.FILES")
+            user.profile_image = request.FILES['profile_image']
             
         user.save()
-        print(f"DEBUG: User saved. profile_image path: {user.profile_image.name if user.profile_image else 'None'}")
         
-        # Update Role-specific profile
-        if role == 'doctor':
-            try:
-                doc = user.doctor_profile
-                if 'name' in data: doc.name = data['name']
-                if 'specialization' in data: doc.specialization = data['specialization']
-                if 'license_number' in data: doc.license_number = data['license_number']
-                if 'phone' in data: doc.phone = data['phone']
-                doc.save()
-            except Doctor.DoesNotExist: pass
-        elif role == 'staff':
-            try:
-                stf = user.staff_profile
-                if 'name' in data: stf.name = data['name']
-                if 'department' in data: stf.department = data['department']
-                if 'license_id' in data: stf.license_id = data['license_id']
-                if 'phone' in data: stf.phone = data['phone']
-                stf.save()
-            except Staff.DoesNotExist: pass
+        try:
+            # Update Role-specific profile
+            if role == 'doctor':
+                try:
+                    doc = user.doctor_profile
+                    if data.get('name'): doc.name = data['name']
+                    if data.get('specialization'): doc.specialization = data['specialization']
+                    if data.get('license_number'): doc.license_number = data['license_number']
+                    phone = data.get('phone_number') or data.get('phone')
+                    if phone: doc.phone = phone
+                    doc.save()
+                except Doctor.DoesNotExist:
+                    pass
+            elif role == 'staff':
+                try:
+                    stf = user.staff_profile
+                    if data.get('name'): stf.name = data['name']
+                    if data.get('department'): stf.department = data['department']
+                    license_val = data.get('license_number') or data.get('license_id')
+                    if license_val: stf.license_id = license_val
+                    phone = data.get('phone_number') or data.get('phone')
+                    if phone: stf.phone = phone
+                    stf.save()
+                except Staff.DoesNotExist:
+                    pass
+        except Exception as e:
+            return Response({"error": f"Profile update failed: {str(e)}"}, status=400)
             
         return Response(CustomUserSerializer(user, context={'request': request}).data)
 
