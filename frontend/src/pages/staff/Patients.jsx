@@ -9,6 +9,7 @@ const StaffPatients = () => {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
 
   useEffect(() => {
     fetchPatients();
@@ -38,11 +39,13 @@ const StaffPatients = () => {
     }
   };
 
-  const filteredPatients = patients.filter(patient => 
-    patient.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    patient.ward.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.bed_number.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPatients = patients.filter(patient => {
+    const matchesSearch = patient.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          patient.ward.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          patient.bed_number.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || patient.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <>
@@ -53,8 +56,8 @@ const StaffPatients = () => {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: '24px', display: 'flex', gap: '16px' }}>
-        <div className="search-box" style={{ flex: 1 }}>
+      <div className="card" style={{ marginBottom: '24px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+        <div className="search-box" style={{ flex: 1, minWidth: '250px' }}>
           <Search className="search-icon" />
           <input 
             type="text" 
@@ -63,7 +66,20 @@ const StaffPatients = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button className="btn btn-outline" style={{ padding: '12px' }}><Filter size={18} /></button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <select 
+            className="form-select" 
+            style={{ width: '180px', borderRadius: '12px', border: '1px solid var(--border)', padding: '0 12px', outline: 'none' }}
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="all">All Statuses</option>
+            <option value="critical">Critical Only</option>
+            <option value="warning">Warning Only</option>
+            <option value="stable">Stable Only</option>
+          </select>
+          <button className="btn btn-outline" style={{ padding: '12px' }}><Filter size={18} /></button>
+        </div>
       </div>
 
       {loading ? (

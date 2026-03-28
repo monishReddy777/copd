@@ -77,7 +77,6 @@ const PatientDetail = () => {
       { key: 'vitals', label: 'Vitals' },
       { key: 'abg', label: 'ABG Records' },
       { key: 'symptoms', label: 'Symptoms' },
-      { key: 'niv', label: 'NIV & ICU' },
     ] : []),
     ...(role === 'admin' ? [
       { key: 'vitals', label: 'Vitals' },
@@ -89,10 +88,10 @@ const PatientDetail = () => {
       { key: 'oxygen', label: 'O₂ Status' },
       { key: 'symptoms', label: 'Symptoms' },
       { key: 'ai-analysis', label: 'AI Analysis' },
-      { key: 'niv', label: 'NIV & ICU' },
       { key: 'therapy', label: 'AI Therapy' },
       { key: 'trends', label: 'ABG Trends' },
       { key: 'escalation', label: 'Escalation' },
+      { key: 'niv', label: 'NIV & ICU' },
     ] : []),
   ];
 

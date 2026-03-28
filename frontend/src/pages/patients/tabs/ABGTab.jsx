@@ -58,14 +58,26 @@ const ABGTab = ({ patientId }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validation
+    const ph = parseFloat(formData.ph);
+    const paco2 = parseFloat(formData.paco2);
+    const pao2 = parseFloat(formData.pao2);
+    const hco3 = parseFloat(formData.hco3);
+
+    if (ph < 6.8 || ph > 7.8) return toast.error('Invalid pH. Range: 6.8 - 7.8');
+    if (paco2 < 20 || paco2 > 80) return toast.error('Invalid PaCO₂. Range: 20 - 80 mmHg');
+    if (pao2 < 30 || pao2 > 120) return toast.error('Invalid PaO₂. Range: 30 - 120 mmHg');
+    if (hco3 < 10 || hco3 > 40) return toast.error('Invalid HCO₃. Range: 10 - 40 mmol/L');
+
     setSubmitting(true);
     try {
       const payload = {
         patient: patientId,
-        ph: parseFloat(formData.ph),
-        paco2: parseFloat(formData.paco2),
-        pao2: parseFloat(formData.pao2),
-        hco3: parseFloat(formData.hco3),
+        ph,
+        paco2,
+        pao2,
+        hco3,
       };
       
       await addABG(payload);
@@ -142,23 +154,23 @@ const ABGTab = ({ patientId }) => {
             <form onSubmit={handleSubmit}>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">pH</label>
-                  <input type="number" step="0.01" name="ph" className="form-input" value={formData.ph} onChange={handleChange} required placeholder="7.35–7.45" />
+                  <label className="form-label">pH (6.8 - 7.8)</label>
+                  <input type="number" step="0.01" name="ph" className="form-input" value={formData.ph} onChange={handleChange} required placeholder="6.8 - 7.8" min="6.8" max="7.8" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">PaCO2 (mmHg)</label>
-                  <input type="number" step="0.1" name="paco2" className="form-input" value={formData.paco2} onChange={handleChange} required placeholder="35–45" />
+                  <label className="form-label">PaCO2 (20 - 80 mmHg)</label>
+                  <input type="number" step="0.1" name="paco2" className="form-input" value={formData.paco2} onChange={handleChange} required placeholder="20 - 80" min="20" max="80" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">PaO2 (mmHg)</label>
-                  <input type="number" step="0.1" name="pao2" className="form-input" value={formData.pao2} onChange={handleChange} required placeholder="75–100" />
+                  <label className="form-label">PaO2 (30 - 120 mmHg)</label>
+                  <input type="number" step="0.1" name="pao2" className="form-input" value={formData.pao2} onChange={handleChange} required placeholder="30 - 120" min="30" max="120" />
                 </div>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">HCO3 (mEq/L)</label>
-                  <input type="number" step="0.1" name="hco3" className="form-input" value={formData.hco3} onChange={handleChange} required placeholder="22–26" />
+                  <label className="form-label">HCO3 (10 - 40 mmol/L)</label>
+                  <input type="number" step="0.1" name="hco3" className="form-input" value={formData.hco3} onChange={handleChange} required placeholder="10 - 40" min="10" max="40" />
                 </div>
               </div>
 

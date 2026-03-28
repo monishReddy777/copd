@@ -35,6 +35,7 @@ import StaffProfile from './pages/staff/Profile';
 // Patient Pages
 import AddPatient from './pages/patients/AddPatient';
 import PatientDetail from './pages/patients/PatientDetail';
+import ReassessmentChecklist from './pages/patients/ReassessmentChecklist';
 
 // Settings Page
 import Settings from './pages/settings/Settings';
@@ -114,6 +115,9 @@ function App() {
             } />
             <Route path="/patients/:id" element={
               <ProtectedRoute allowedRoles={['doctor', 'staff']}><PatientDetail /></ProtectedRoute>
+            } />
+            <Route path="/patients/:id/reassessment" element={
+              <ProtectedRoute allowedRoles={['staff']}><ReassessmentChecklist /></ProtectedRoute>
             } />
             
             {/* Shared Settings Route */}

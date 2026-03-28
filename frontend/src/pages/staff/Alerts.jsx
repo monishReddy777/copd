@@ -16,7 +16,8 @@ const StaffAlerts = () => {
   const fetchAlerts = async () => {
     try {
       const { data } = await getStaffAlerts();
-      setAlerts(data.results || data);
+      const results = data.results || data;
+      setAlerts(results.filter(a => !a.acknowledged));
     } catch (error) {
       toast.error('Failed to load alerts');
       setAlerts([
@@ -37,11 +38,11 @@ const StaffAlerts = () => {
         await updateAlert(id, 'acknowledge');
       }
       toast.success(`Alert acknowledged`);
-      setAlerts(alerts.map(a => a.id === id ? { ...a, has_actions: false, acknowledged: true } : a));
+      setAlerts(alerts.filter(a => a.id !== id));
     } catch (error) {
       // Mock Data fallback
       toast.success(`Alert acknowledged`);
-      setAlerts(alerts.map(a => a.id === id ? { ...a, has_actions: false, acknowledged: true } : a));
+      setAlerts(alerts.filter(a => a.id !== id));
     }
   };
 

@@ -35,8 +35,8 @@ export const updateStaffAbg = (id, data) => api.post(`/patients/${id}/abg/`, dat
 
 // Reassessment
 export const getReassessments = () => api.get('/reassessment/');
-export const postScheduleReassessment = (patientId, data) => api.post(`/patients/${patientId}/reassessment-schedule/`, data);
+export const postScheduleReassessment = (patientId, data) => api.post(`/patients/${patientId}/schedule-reassessment/`, data);
 export const getStaffChecklist = () => api.get('/staff-checklist/');
 export const getStaffReassessmentValues = (id) => api.get(`/patient/staff-reassessments/${id}/`);
-export const getReassessmentSchedule = (patientId) => api.get(`/patients/${patientId}/reassessment-schedule/`);
+export const getReassessmentSchedule = (patientId) => api.get(`/patients/${patientId}/schedule-reassessment/`);
 export const getStaffList = () => api.get('/staff-list/');

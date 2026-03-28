@@ -4,6 +4,7 @@ from datetime import timedelta
 from .models import *
 import re
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 
 
 class SignupSerializer(serializers.Serializer):
@@ -66,6 +67,20 @@ class SignupSerializer(serializers.Serializer):
 
         return value
 
+    def validate(self, data):
+        # Validate license/staff id is unique BEFORE saving
+        role = data.get('role', 'staff').lower()
+        if 'doctor' in role or 'physician' in role:
+            license_number = data.get('license_number')
+            if license_number and Doctor.objects.filter(license_number=license_number).exists():
+                raise serializers.ValidationError({"license_number": "License number already registered."})
+        else:
+            staff_id = data.get('staff_id')
+            if staff_id and Staff.objects.filter(license_id=staff_id).exists():
+                raise serializers.ValidationError({"staff_id": "Staff ID already registered."})
+        return data
+
+    @transaction.atomic
     def create(self, validated_data):
         # Resolve name
         name = validated_data.get('name') or validated_data.get('full_name', '')
@@ -95,6 +110,7 @@ class SignupSerializer(serializers.Serializer):
             last_name=last_name,
             role=role,
             phone_number=validated_data.get('phone_number', ''),
+            department=validated_data.get('department', ''),
             is_approved=False,
             is_active=False
         )
@@ -292,6 +308,7 @@ class ReassessmentChecklistSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReassessmentChecklist
         fields = '__all__'
+        read_only_fields = ['patient']
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:

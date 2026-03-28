@@ -151,7 +151,7 @@ const StaffDashboard = () => {
             const status = getReassessmentStatus(patient.next_reassessment_time);
             return (
               <div key={patient.id} 
-                   onClick={() => navigate(`/patients/${patient.id}?tab=vitals`)}
+                   onClick={() => navigate(`/patients/${patient.id}/reassessment`)}
                    style={{ 
                      background: '#FFFFFF', borderRadius: '16px', padding: '16px', 
                      display: 'flex', alignItems: 'center', border: '1px solid #F3F4F6',

@@ -41,16 +41,32 @@ const VitalsTab = ({ patientId }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validation
+    const spo2 = parseFloat(formData.spo2);
+    const heart_rate = parseInt(formData.heart_rate);
+    const respiratory_rate = parseInt(formData.respiratory_rate);
+    const blood_pressure_sys = parseInt(formData.blood_pressure_sys);
+    const blood_pressure_dia = parseInt(formData.blood_pressure_dia);
+    const temperature = parseFloat(formData.temperature);
+
+    if (spo2 < 70 || spo2 > 100) return toast.error('Invalid SpO2. Range: 70 - 100%');
+    if (heart_rate < 40 || heart_rate > 130) return toast.error('Invalid Heart Rate. Range: 40 - 130 bpm');
+    if (respiratory_rate < 8 || respiratory_rate > 30) return toast.error('Invalid Respiratory Rate. Range: 8 - 30 bpm');
+    if (blood_pressure_sys < 90 || blood_pressure_sys > 180) return toast.error('Invalid Systolic BP. Range: 90 - 180 mmHg');
+    if (blood_pressure_dia < 60 || blood_pressure_dia > 120) return toast.error('Invalid Diastolic BP. Range: 60 - 120 mmHg');
+    if (temperature < 34.0 || temperature > 41.0) return toast.error('Invalid Temperature. Range: 34.0 - 41.0 °C');
+
     setSubmitting(true);
     try {
       const payload = {
         patient: patientId,
-        heart_rate: parseInt(formData.heart_rate),
-        respiratory_rate: parseInt(formData.respiratory_rate),
-        systolic_bp: parseInt(formData.blood_pressure_sys),
-        diastolic_bp: parseInt(formData.blood_pressure_dia),
-        temperature: parseFloat(formData.temperature),
-        spo2: parseFloat(formData.spo2),
+        heart_rate,
+        respiratory_rate,
+        systolic_bp: blood_pressure_sys,
+        diastolic_bp: blood_pressure_dia,
+        temperature,
+        spo2,
         fio2: 21, // default room air
         loc_alert: 'Alert' // default
       };
@@ -86,31 +102,31 @@ const VitalsTab = ({ patientId }) => {
           <form onSubmit={handleSubmit}>
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">SpO2 (%)</label>
-                <input type="number" step="0.1" name="spo2" className="form-input" value={formData.spo2} onChange={handleChange} required placeholder="e.g. 94" />
+                <label className="form-label">SpO2 (70 - 100%)</label>
+                <input type="number" step="0.1" name="spo2" className="form-input" value={formData.spo2} onChange={handleChange} required placeholder="70 - 100" min="70" max="100" />
               </div>
               <div className="form-group">
-                <label className="form-label">Heart Rate (bpm)</label>
-                <input type="number" name="heart_rate" className="form-input" value={formData.heart_rate} onChange={handleChange} required placeholder="e.g. 80" />
+                <label className="form-label">Heart Rate (40 - 130 bpm)</label>
+                <input type="number" name="heart_rate" className="form-input" value={formData.heart_rate} onChange={handleChange} required placeholder="40 - 130" min="40" max="130" />
               </div>
               <div className="form-group">
-                <label className="form-label">Resp Rate (/min)</label>
-                <input type="number" name="respiratory_rate" className="form-input" value={formData.respiratory_rate} onChange={handleChange} required placeholder="e.g. 18" />
+                <label className="form-label">Resp Rate (8 - 30 /min)</label>
+                <input type="number" name="respiratory_rate" className="form-input" value={formData.respiratory_rate} onChange={handleChange} required placeholder="8 - 30" min="8" max="30" />
               </div>
             </div>
 
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">BP Systolic (mmHg)</label>
-                <input type="number" name="blood_pressure_sys" className="form-input" value={formData.blood_pressure_sys} onChange={handleChange} required placeholder="e.g. 120" />
+                <label className="form-label">BP Systolic (90 - 180 mmHg)</label>
+                <input type="number" name="blood_pressure_sys" className="form-input" value={formData.blood_pressure_sys} onChange={handleChange} required placeholder="90 - 180" min="90" max="180" />
               </div>
               <div className="form-group">
-                <label className="form-label">BP Diastolic (mmHg)</label>
-                <input type="number" name="blood_pressure_dia" className="form-input" value={formData.blood_pressure_dia} onChange={handleChange} required placeholder="e.g. 80" />
+                <label className="form-label">BP Diastolic (60 - 120 mmHg)</label>
+                <input type="number" name="blood_pressure_dia" className="form-input" value={formData.blood_pressure_dia} onChange={handleChange} required placeholder="60 - 120" min="60" max="120" />
               </div>
               <div className="form-group">
-                <label className="form-label">Temperature (°C)</label>
-                <input type="number" step="0.1" name="temperature" className="form-input" value={formData.temperature} onChange={handleChange} required placeholder="e.g. 37.2" />
+                <label className="form-label">Temperature (34 - 41 °C)</label>
+                <input type="number" step="0.1" name="temperature" className="form-input" value={formData.temperature} onChange={handleChange} required placeholder="34.0 - 41.0" min="34.0" max="41.0" />
               </div>
             </div>
 

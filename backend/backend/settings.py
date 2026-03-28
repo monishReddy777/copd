@@ -118,8 +118,10 @@ SIMPLE_JWT = {
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-# ─── Email Configuration (Gmail SMTP) ───────────────────────────────────────
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# ─── Email Configuration (Console/Development) ─────────────────────────────────
+# SMTP is blocked on your network (Ports 587 & 465 timed out).
+# Use 'console' backend to see OTPs in your terminal while developing.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True

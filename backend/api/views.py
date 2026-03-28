@@ -664,7 +664,11 @@ class BaselineDetailsAPIView(APIView):
 class AlertListAPIView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):
-        alerts = Alert.objects.all().order_by('-created_at')
+        if request.user.role == 'staff':
+            # For staff, only show reassessment-related alerts
+            alerts = Alert.objects.filter(message__icontains='reassessment').order_by('-created_at')
+        else:
+            alerts = Alert.objects.all().order_by('-created_at')
         return Response(AlertSerializer(alerts, many=True).data)
 
 class RecommendationAPIView(APIView):
@@ -704,12 +708,26 @@ class OxygenRequirementAPIView(APIView):
 class ReassessmentAPIView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request, pk):
-        p = Patient.objects.get(pk=pk)
+        try:
+            p = Patient.objects.get(pk=pk)
+        except Patient.DoesNotExist:
+            return Response({"error": "Patient not found"}, status=status.HTTP_404_NOT_FOUND)
+            
         serializer = ReassessmentChecklistSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(patient=p)
-            return Response(serializer.data, status=201)
-        return Response(serializer.errors, status=400)
+            checklist = serializer.save(patient=p)
+            
+            # Mark the latest incomplete reassessment schedule as completed
+            schedule = ReassessmentSchedule.objects.filter(patient=p, completed=False).order_by('scheduled_at').first()
+            if schedule:
+                schedule.completed = True
+                schedule.save()
+            
+            # Clear any "Perform Reassessment" alerts for this patient
+            Alert.objects.filter(patient=p, message__icontains='reassessment').delete()
+            
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class NotificationAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -953,9 +971,40 @@ class AIRiskAPIView(APIView):
             if abg and abg.paco2 > 45:
                 key_factors.append({"factor": "Hypercapnia", "value": f"{abg.paco2} mmHg", "severity": "high"})
             
+            # Calculate NIV / ICU Status based on ABG & Vitals
+            niv_status = 'Not Currently Indicated'
+            niv_rationale = 'pH >= 7.35 and PaCO2 is stable. Continue careful oxygen therapy and monitor.'
+            icu_status = 'Stable'
+            icu_triggers = []
+            
+            if abg:
+                # ICU Check
+                if abg.ph < 7.25:
+                    icu_triggers.append(f"Severe Acidosis (pH {abg.ph})")
+                if abg.paco2 > 60:
+                    icu_triggers.append(f"Severe Hypercapnia (PaCO2 {abg.paco2} mmHg)")
+                
+                # Check FiO2 and SpO2 from vitals
+                if vitals and vitals.spo2 < 85 and getattr(vitals, 'fio2', 21) > 40:
+                    icu_triggers.append(f"Refractory Hypoxemia (SpO2 {vitals.spo2}% on FiO2 {vitals.fio2}%)")
+                    
+                if icu_triggers:
+                    icu_status = 'ICU Review Required'
+                    niv_status = 'ICU Review Required'
+                    niv_rationale = 'Patient meets criteria for immediate ICU review.'
+                else:
+                    # BiPAP Check
+                    if abg.ph < 7.35 and abg.paco2 > 45:
+                        niv_status = 'BiPAP Indicated'
+                        niv_rationale = f'Acute respiratory acidosis (pH {abg.ph}, PaCO2 {abg.paco2} mmHg). Initiate BiPAP to improve ventilation.'
+
             return Response({
                 **prediction,
                 "key_factors": key_factors,
+                "niv_status": niv_status,
+                "niv_rationale": niv_rationale,
+                "icu_status": icu_status,
+                "icu_triggers": icu_triggers
             })
         except Patient.DoesNotExist:
             return Response(status=404)

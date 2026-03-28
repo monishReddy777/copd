@@ -24,6 +24,7 @@ export const addABG = (data) => api.post(`/patients/${data.patient || data.patie
 
 // Reassessment
 export const getReassessmentChecklist = (id) => api.get(`/patients/${id}/reassessment-checklist/`);
+export const addReassessment = (id, data) => api.post(`/patients/${id}/reassessment/`, data);
 
 // AI & Decision Support
 export const getAIRisk = (id) => api.get(`/patient/ai-risk/${id}/`);

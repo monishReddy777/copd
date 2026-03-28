@@ -25,7 +25,18 @@ const Signup = () => {
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [nameError, setNameError] = useState('');
   const [showTerms, setShowTerms] = useState(false);
+
+  const validateName = (name) => {
+    if (name.length > 0 && name.length < 3) {
+      return 'Name must be at least 3 characters';
+    }
+    if (name.length > 0 && !/^[a-zA-Z\s]*$/.test(name)) {
+      return 'Name must contain only alphabets';
+    }
+    return '';
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -34,6 +45,9 @@ const Signup = () => {
 
     if (name === 'password') {
       validatePassword(value);
+    }
+    if (name === 'name') {
+      setNameError(validateName(value));
     }
   };
 
@@ -94,6 +108,11 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (nameError) {
+      toast.error(nameError);
+      return;
+    }
+
     if (passwordError) {
       toast.error(passwordError);
       return;
@@ -179,6 +198,9 @@ const Signup = () => {
                 type="text" name="name" className="form-input" 
                 placeholder="Dr. John Doe" value={formData.name} onChange={handleChange} required 
               />
+              {nameError && (
+                <p style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '4px' }}>{nameError}</p>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Username</label>
